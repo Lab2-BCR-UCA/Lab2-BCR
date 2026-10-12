@@ -4,3 +4,4 @@ __pycache__/
 *.html
 _descartados/
 data/historico/
+variables_externas/data/
