@@ -6,7 +6,6 @@ Descarga molienda mensual de soja; ventas en descargar_combustibles.py.
 import argparse
 import csv
 import hashlib
-import io
 import json
 import re
 import time
