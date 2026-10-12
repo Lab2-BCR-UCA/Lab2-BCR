@@ -358,17 +358,11 @@ code("""
 # Rezago MÍNIMO utilizable por variable (meses). PROVISORIO — lo fija SCRUM-26.
 #  0 = el dato del propio mes ya está disponible al pronosticar.
 #  1 = recién está disponible el dato del mes anterior, etc.
-rezago_min = {
-    "tipo_cambio":            0,   # BCRA, inmediato
-    "precio_soja_pizarra":    0,   # CAC, diario
-    "precio_maiz_pizarra":    0,   # CAC, diario
-    "precio_biodiesel":       0,   # SE, precio regulado del mes
-    "precio_bioetanol_cana":  0,
-    "precio_bioetanol_maiz":  0,
-    "ventas_gasoil":          1,   # SESCO, ~1-2 meses de atraso
-    "ventas_nafta":           1,
-    "molienda_soja":          1,   # SAGyP, ~1-2 meses de atraso
-}
+# Tabla de SCRUM-26: data/disponibilidad_variables.csv (ver docs/disponibilidad_temporal.md)
+disp = pd.read_csv(DATA / "disponibilidad_variables.csv")
+disp_ext = disp[disp["tipo"] == "externa"]
+rezago_min = dict(zip(disp_ext["variable"], disp_ext["rezago_min"].astype(int)))
+print(disp_ext[["variable", "rezago_min", "estado"]].to_string(index=False))
 DEFAULT_MIN = 1  # para cualquier variable no listada
 
 # Variables con muchos huecos → CCF de confianza menor (ver docs/fuentes_series.md).
@@ -445,7 +439,7 @@ md("""
   múltiple**: ~1 de cada 20 celdas cruza la banda por azar, así que las
   "significativas" en rezagos largos y sin mecanismo (9–12) son sospechosas.
   Hay que filtrar por mecanismo, no solo por el número.
-- La tabla de disponibilidad (`rezago_min`) es **provisoria**: la cierra
+- La tabla de disponibilidad (`rezago_min`) se lee de `data/disponibilidad_variables.csv`; la cierra
   SCRUM-26. Si cambia el rezago mínimo de una variable, se recalcula la
   selección sin tocar nada más.
 
