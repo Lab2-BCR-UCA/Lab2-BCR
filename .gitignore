@@ -4,4 +4,6 @@ __pycache__/
 *.html
 _descartados/
 data/historico/
-variables_externas/data/
+variables_externas/data/*
+!variables_externas/data/soja_mensual.csv
+!variables_externas/data/combustibles_mensual.csv

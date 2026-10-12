@@ -3,14 +3,16 @@ producción (SCRUM-28).
 
 El notebook:
   1. Carga las series objetivo (producción) y todas las variables externas
-     candidatas que encuentre (precios, tipo de cambio, pizarra, molienda de
-     soja y ventas de combustibles).
+     candidatas (precios, tipo de cambio, pizarra, molienda de soja y ventas de
+     combustibles).
   2. Estadística descriptiva y gráficos de cada variable.
   3. Justifica el diferenciado con ADF (nivel vs. variación mensual en log).
   4. Correlación cruzada (CCF) con la producción para rezagos 0 a 12 meses,
-     sobre las series diferenciadas, con bandas de significancia.
-  5. Filtra por la tabla de disponibilidad temporal (provisoria, SCRUM-26) y
-     arma la lista de variables candidatas con su rezago recomendado.
+     sobre las series **diferenciadas y desestacionalizadas**, con bandas de
+     significancia.
+  5. Filtra por la tabla de disponibilidad temporal (SCRUM-26) y por un conjunto
+     de rezagos con mecanismo, y arma la lista de candidatas con su rezago
+     recomendado.
 
 Salida: notebooks/eda_variables_externas.ipynb y, al correrlo,
 results/variables_candidatas.csv.
@@ -48,18 +50,22 @@ modelos; deja una lista de candidatas con un rezago recomendado.
 
 1. Estadística descriptiva y gráficos de cada variable.
 2. **Correlación cruzada (CCF)** con la producción para rezagos de **0 a 12
-   meses**, sobre **series diferenciadas** (variación mensual en log) para
-   evitar correlaciones espurias por tendencia común.
-3. Respetamos una **tabla de disponibilidad temporal** al elegir el rezago: de
-   nada sirve una correlación en un rezago al que no vamos a tener acceso en el
-   momento de pronosticar.
+   meses**, sobre series **diferenciadas y desestacionalizadas**: la variación
+   mensual en log quita la tendencia, y restar la media de cada mes calendario
+   quita la estacionalidad. Las dos cosas juntas evitan correlaciones espurias
+   (varias series —caña, bioetanol total, pizarra— son estacionales, y sin
+   sacar la estacionalidad la CCF queda inflada).
+3. Respetamos la **tabla de disponibilidad temporal** (SCRUM-26,
+   `data/disponibilidad_variables.csv`) al elegir el rezago: de nada sirve una
+   correlación en un rezago al que no vamos a tener acceso al pronosticar.
+4. Limitamos la elección a **rezagos con mecanismo** (0–3 meses y 12), para no
+   quedarnos con un cruce de la banda por azar entre los 13 rezagos probados.
 
 > **Nota de alcance.** Las series de precio están en **pesos nominales**
 > (arrastran inflación). Al diferenciar en log se saca la tendencia, y como la
 > producción es física (tn / m³, no pesos), la comovimiento inflacionario no
 > genera correlación espuria directa. Aun así, para modelar conviene evaluar
-> versiones deflactadas. La tabla de disponibilidad es **provisoria**: la
-> define SCRUM-26; acá se usa un parámetro editable.
+> versiones deflactadas.
 """)
 
 code("""
@@ -89,7 +95,10 @@ md("""
 ### Series objetivo (producción)
 
 Son las cuatro series que hay que pronosticar: biodiesel (tn) y bioetanol
-total, de maíz y de caña (m³).
+total, de maíz y de caña (m³). **Recortamos cada serie a su inicio de
+entrenamiento del protocolo** (`evaluacion.py`): bioetanol total y caña arrancan
+en 2013, no antes, para que la CCF se calcule sobre el mismo tramo que después
+usan los modelos (no sobre el arranque ruidoso 2009–2012).
 """)
 
 code("""
@@ -98,30 +107,43 @@ def serie_mensual(df, col):
            .set_index("fecha")[col].sort_index().astype(float))
     return s[~s.index.duplicated()]
 
+# Inicio de entrenamiento por serie (igual que el protocolo de evaluación).
+inicio_protocolo = {
+    "biodiesel":       "2008-01",
+    "bioetanol_total": "2013-01",
+    "bioetanol_maiz":  "2012-09",
+    "bioetanol_cana":  "2013-01",
+}
+
 bd = pd.read_csv(DATA / "produccion_biodiesel.csv")
 be = pd.read_csv(DATA / "produccion_bioetanol.csv")
 
-objetivos = {
+crudos = {
     "biodiesel":       serie_mensual(bd, "produccion_tn"),
     "bioetanol_total": serie_mensual(be, "produccion_total_m3"),
     "bioetanol_maiz":  serie_mensual(be, "produccion_maiz_m3"),
     "bioetanol_cana":  serie_mensual(be, "produccion_cana_m3"),
 }
+objetivos = {n: s[s.index >= pd.Timestamp(inicio_protocolo[n])] for n, s in crudos.items()}
 for n, s in objetivos.items():
-    print(f"{n:16s}: {s.index.min():%Y-%m} → {s.index.max():%Y-%m}  ({len(s)} meses)")
+    print(f"{n:16s}: {s.index.min():%Y-%m} → {s.index.max():%Y-%m}  ({len(s)} meses, desde {inicio_protocolo[n]})")
 """)
 
 md("""
 ### Variables externas candidatas
 
-Levantamos todo lo que haya disponible, de los **dos relevamientos**:
+Las cargamos de los **dos relevamientos**:
 
 - **Ya estaban en el repo** (precio, TC, pizarra), en `data/` — documentadas en
   `docs/fuentes_series.md` (Flor).
 - **Nuevas de SCRUM-25** (molienda de soja, ventas de gasoil/nafta), en
   `variables_externas/data/` — documentadas en `variables_externas/README.md`
-  (Victoria). Estas se generan corriendo sus scrapers una vez; si faltan, se
-  omiten y el resto del análisis corre igual.
+  (Victoria).
+
+Los dos CSV de SCRUM-25 están **versionados** en el repo (son chicos), así que
+el notebook es reproducible en un clon limpio. Si por algún motivo faltan, el
+notebook **corta con error** en vez de seguir con una lista incompleta (así no
+se pisa `variables_candidatas.csv` con menos filas sin que nadie se entere).
 """)
 
 code("""
@@ -145,15 +167,18 @@ for archivo, col, nombre, org in fuentes:
         externas[nombre] = serie_mensual(pd.read_csv(archivo), col)
         origen[nombre] = org
     else:
-        faltantes.append(f"{nombre} ({archivo.name}, {org})")
+        faltantes.append(f"{nombre} ({archivo}, {org})")
+
+if faltantes:
+    raise FileNotFoundError(
+        "Faltan fuentes de variables externas; no sigo para no generar una "
+        "lista incompleta. Deberían estar versionadas en el repo. Faltan:\\n  - "
+        + "\\n  - ".join(faltantes)
+    )
 
 print("Variables externas cargadas:")
 for n, s in externas.items():
     print(f"  [{origen[n]:8s}] {n:22s}: {s.index.min():%Y-%m} → {s.index.max():%Y-%m}  ({len(s)} meses)")
-if faltantes:
-    print("\\nFALTAN (corré los scrapers de variables_externas/):")
-    for f in faltantes:
-        print("  -", f)
 """)
 
 md("""
@@ -198,16 +223,29 @@ fig.tight_layout(); plt.show()
 """)
 
 md("""
-## 3. ¿Por qué diferenciar? Estacionariedad (ADF)
+## 3. Preparación: diferenciar y desestacionalizar
 
-Casi todas las series tienen tendencia (sobre todo las de precio, por
-inflación). Correlacionar series con tendencia da correlaciones **espurias**:
-dos cosas que suben juntas "correlacionan" aunque no tengan relación.
+Dos problemas a sacar antes de correlacionar:
 
-La solución estándar es trabajar sobre la **variación mensual en log**
-(`Δ log x = log(x_t) − log(x_{t-1})`), que quita la tendencia y deja la señal
-de corto plazo. El test ADF confirma: en nivel no se rechaza la raíz unitaria
-(no estacionaria), diferenciada sí.
+1. **Tendencia.** Casi todas las series suben (los precios, por inflación).
+   Correlacionar series con tendencia da correlaciones **espurias**. Se saca con
+   la **variación mensual en log** (`Δ log x = log(x_t) − log(x_{t-1})`). El ADF
+   lo confirma: en nivel no se rechaza la raíz unitaria, diferenciada sí.
+2. **Estacionalidad.** El `Δlog` saca la tendencia pero **no** la
+   estacionalidad, y caña, bioetanol total, ventas y pizarra son estacionales.
+   Dos series con el mismo patrón estacional "correlacionan" aunque no tengan
+   relación. Se saca **restando la media de cada mes calendario** a la serie ya
+   diferenciada.
+
+Trabajamos entonces sobre la **variación mensual desestacionalizada** de cada
+serie (producción y externas).
+
+> **Huecos en los precios regulados.** Según `docs/fuentes_series.md`, los
+> precios regulados tienen meses sin dato (biodiesel 28, bioetanol 41). Una
+> `Δlog` que cruza un hueco no es una variación mensual, así que **no
+> diferenciamos a través de los huecos**: reindexamos a la grilla mensual y la
+> diferencia que toca un faltante queda `NaN`. Esas dos series quedan con `n`
+> chico y su CCF se lee con **confianza menor**.
 """)
 
 code("""
@@ -225,35 +263,13 @@ for n, s in {**objetivos, **externas}.items():
     filas.append({"variable": n, "p_ADF_nivel": pn, "p_ADF_logdiff": pd_,
                   "nivel_estacionario": pn < 0.05 if pn == pn else None,
                   "logdiff_estacionario": pd_ < 0.05 if pd_ == pd_ else None})
-tabla_adf = pd.DataFrame(filas).set_index("variable")
 print("p<0.05 ⇒ estacionaria. Esperamos: nivel NO, log-diff SÍ.")
-tabla_adf.round(3)
-""")
-
-md("""
-Trabajamos entonces sobre `Δ log` de cada serie (tanto la producción como las
-externas). Para la producción esto coincide con la **variación mensual** que ya
-usa el EDA de producción y con lo que publica la BCR en el IACA.
-
-> **Huecos en los precios regulados.** Según `docs/fuentes_series.md` (relevado
-> por Flor), los precios regulados tienen meses sin dato: **biodiesel 28 meses,
-> bioetanol 41**. Una `Δlog` que cruza un hueco **no es** una variación mensual
-> (un salto que abarca varios meses sin dato se contaría como cambio de un
-> mes). Por eso **no diferenciamos a través de los huecos**: reindexamos a la
-> grilla mensual completa, de modo que cualquier diferencia que toque un mes
-> faltante queda `NaN` y se descarta. Así solo quedan variaciones entre meses
-> realmente consecutivos. Esto reduce el `n` de esas dos series y su CCF hay
-> que leerla con **confianza menor**.
+pd.DataFrame(filas).set_index("variable").round(3)
 """)
 
 code("""
 def logdiff(s):
-    \"\"\"Variación mensual en log, SIN diferenciar a través de huecos.
-
-    Reindexa a la grilla mensual completa: si falta el mes t-1, la diferencia
-    del mes t queda NaN y se descarta. Evita tratar un salto que abarca varios
-    meses sin dato como si fuera una variación de un solo mes.
-    \"\"\"
+    \"\"\"Variación mensual en log, SIN diferenciar a través de huecos.\"\"\"
     s = s[s > 0].dropna()
     if s.empty:
         return s
@@ -261,10 +277,17 @@ def logdiff(s):
     s = s.reindex(grilla)
     return np.log(s).diff().dropna()
 
-obj_d = {n: logdiff(s) for n, s in objetivos.items()}
-ext_d = {n: logdiff(s) for n, s in externas.items()}
+def prep(s):
+    \"\"\"Variación mensual en log desestacionalizada (resta la media de cada mes).\"\"\"
+    d = logdiff(s)
+    if d.empty:
+        return d
+    return d - d.groupby(d.index.month).transform("mean")
 
-print("Variaciones mensuales consecutivas disponibles por variable externa:")
+obj_d = {n: prep(s) for n, s in objetivos.items()}
+ext_d = {n: prep(s) for n, s in externas.items()}
+
+print("Observaciones (variación mensual desestacionalizada) por variable externa:")
 for n, s in ext_d.items():
     print(f"  {n:22s}: {len(s):>3} obs")
 """)
@@ -278,19 +301,17 @@ Para cada par (variable externa, producción) calculamos la correlación entre
 $$\rho_k = \mathrm{corr}\big(x_{t-k},\; y_t\big)$$
 
 Un `k` positivo significa que la variable externa **adelanta** a la producción
-en `k` meses (es un indicador líder). Eso es justo lo que sirve para
-pronosticar: si `x` de hace `k` meses anticipa la producción de hoy, y ese dato
-está disponible a tiempo, es una candidata.
+en `k` meses (indicador líder). Las dos series ya vienen diferenciadas y
+desestacionalizadas.
 
-**Significancia:** bandas aproximadas de ±1,96/√n (95%). Una correlación que
-cae dentro de la banda no se distingue de ruido.
+**Significancia:** bandas aproximadas de ±1,96/√n (95%). Una correlación dentro
+de la banda no se distingue de ruido.
 """)
 
 code("""
 MAX_LAG = 12
 
 def ccf_series(x, y, max_lag=MAX_LAG):
-    \"\"\"corr(x[t-k], y[t]) para k=0..max_lag, sobre índices comunes.\"\"\"
     out = {}
     for k in range(max_lag + 1):
         xk = x.shift(k, freq="MS")
@@ -312,12 +333,15 @@ print("CCF lista. Convención: rezago k>0 ⇒ la variable externa adelanta a la 
 md("""
 ### Heatmaps de CCF por serie objetivo
 
-Una grilla por cada producción: filas = variables externas, columnas = rezago
-(0 a 12). Rojo = correlación positiva, azul = negativa. Marcamos con un punto
-las celdas **significativas** (fuera de la banda de ±1,96/√n).
+Una grilla por producción: filas = variables, columnas = rezago (0 a 12). Rojo =
+positiva, azul = negativa. Punto negro = **significativa** (fuera de ±1,96/√n).
+Se muestran los 13 rezagos, pero la **selección** de más abajo solo considera
+los rezagos con mecanismo (0–3 y 12).
 """)
 
 code("""
+REZAGOS_PERMITIDOS = [0, 1, 2, 3, 12]  # corto plazo + ciclo anual
+
 def heatmap_ccf(nombre_target, target_d):
     corr, n = tabla_ccf(target_d, ext_d)
     banda = 1.96 / np.sqrt(n.replace(0, np.nan))
@@ -327,11 +351,13 @@ def heatmap_ccf(nombre_target, target_d):
     ax.set_xticks(range(MAX_LAG + 1)); ax.set_xticklabels(range(MAX_LAG + 1))
     ax.set_yticks(range(len(corr))); ax.set_yticklabels(corr.index, fontsize=9)
     ax.set_xlabel("rezago (meses)")
+    for j in REZAGOS_PERMITIDOS:      # resalta las columnas que la selección usa
+        ax.axvline(j, color="k", lw=0.4, ls=":", alpha=0.4)
     for i in range(len(corr)):
         for j in range(MAX_LAG + 1):
             if bool(sig.values[i, j]):
                 ax.plot(j, i, "o", ms=3, color="black")
-    ax.set_title(f"CCF — {nombre_target}  (• = significativa 95%)", fontsize=11)
+    ax.set_title(f"CCF — {nombre_target}  (• significativa 95%; línea = rezago considerado)", fontsize=10)
     fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
     fig.tight_layout(); plt.show()
     return corr, n
@@ -342,30 +368,30 @@ for nombre, td in obj_d.items():
 """)
 
 md("""
-## 5. Disponibilidad temporal y selección de candidatas
+## 5. Selección de candidatas
 
-El rezago recomendado no puede ser cualquiera: tiene que ser uno al que
-**vayamos a tener acceso** cuando pronostiquemos. Para un pronóstico a un mes,
-al estimar la producción del mes `t` (que la Secretaría publica con ~2 meses de
-atraso), ya tenemos la variable externa hasta cierto mes según su propio
-calendario de publicación.
+El rezago recomendado tiene que cumplir **dos** condiciones:
 
-Codificamos un **rezago mínimo disponible** por variable. Es **provisorio**: lo
-define SCRUM-26. Acá va un valor conservador y editable.
+1. **Disponible** cuando pronostiquemos — rezago `≥ rezago_min` de la tabla de
+   disponibilidad temporal (SCRUM-26, `data/disponibilidad_variables.csv`).
+2. **Con mecanismo** — entre los rezagos `0–3` (efecto de corto plazo) o `12`
+   (ciclo anual). Esto evita quedarnos con un cruce de la banda por azar: con 13
+   rezagos probados, ~1 de cada 20 cruza solo por ruido, y los rezagos sueltos
+   de 4 a 11 meses no tienen una explicación clara.
+
+El rezago recomendado es el de **mayor |correlación|** entre los que cumplen las
+dos condiciones; es candidata si además es **significativo** (95%).
 """)
 
 code("""
-# Rezago MÍNIMO utilizable por variable (meses). PROVISORIO — lo fija SCRUM-26.
-#  0 = el dato del propio mes ya está disponible al pronosticar.
-#  1 = recién está disponible el dato del mes anterior, etc.
-# Tabla de SCRUM-26: data/disponibilidad_variables.csv (ver docs/disponibilidad_temporal.md)
 disp = pd.read_csv(DATA / "disponibilidad_variables.csv")
 disp_ext = disp[disp["tipo"] == "externa"]
 rezago_min = dict(zip(disp_ext["variable"], disp_ext["rezago_min"].astype(int)))
+print("rezago_min (SCRUM-26):")
 print(disp_ext[["variable", "rezago_min", "estado"]].to_string(index=False))
-DEFAULT_MIN = 1  # para cualquier variable no listada
+DEFAULT_MIN = 1
 
-# Variables con muchos huecos → CCF de confianza menor (ver docs/fuentes_series.md).
+# Precios regulados: muchos huecos → confianza menor (docs/fuentes_series.md).
 baja_confianza = {"precio_biodiesel", "precio_bioetanol_cana", "precio_bioetanol_maiz"}
 
 def seleccionar(nombre_target):
@@ -375,40 +401,36 @@ def seleccionar(nombre_target):
     for var in corr.index:
         fila = corr.loc[var]
         kmin = rezago_min.get(var, DEFAULT_MIN)
-        disponibles = fila.loc[kmin:]
-        if disponibles.abs().notna().sum() == 0:
+        validos = [k for k in REZAGOS_PERMITIDOS if k >= kmin and pd.notna(fila[k])]
+        if not validos:
             continue
-        kg = fila.abs().idxmax()
-        kd = disponibles.abs().idxmax()
-        sig_d = abs(disponibles[kd]) > banda.loc[var, kd]
+        kd = max(validos, key=lambda k: abs(fila[k]))   # mejor rezago válido
+        sig = abs(fila[kd]) > banda.loc[var, kd]
         filas.append({
             "target": nombre_target, "variable": var, "origen": origen[var],
-            "rezago_min_disp": kmin,
-            "mejor_rezago_disp": int(kd), "corr_disp": round(float(fila[kd]), 3),
-            "signif_disp": bool(sig_d),
-            "mejor_rezago_global": int(kg), "corr_global": round(float(fila[kg]), 3),
-            "n_obs": int(n.loc[var, kd]),
+            "rezago_min_disp": kmin, "rezago_recomendado": int(kd),
+            "corr": round(float(fila[kd]), 3), "n_obs": int(n.loc[var, kd]),
+            "significativa": bool(sig),
             "confianza": "baja (huecos)" if var in baja_confianza else "normal",
-            "candidata": bool(sig_d),
+            "candidata": bool(sig),
         })
     return pd.DataFrame(filas)
 
 candidatas = pd.concat([seleccionar(t) for t in obj_d], ignore_index=True)
-candidatas = candidatas.sort_values(["target", "signif_disp", "corr_disp"],
+candidatas = candidatas.sort_values(["target", "candidata", "corr"],
                                     ascending=[True, False, False],
-                                    key=lambda c: c.abs() if c.name == "corr_disp" else c)
+                                    key=lambda c: c.abs() if c.name == "corr" else c)
 candidatas.to_csv(OUT / "variables_candidatas.csv", index=False)
-print("Guardado:", OUT / "variables_candidatas.csv")
+print("\\nGuardado:", OUT / "variables_candidatas.csv")
 candidatas
 """)
 
 md("""
 ### Lista final de candidatas por serie
 
-Nos quedamos con las que tienen una correlación **significativa** en un rezago
-**disponible**. Ese es el entregable del DoD: variables candidatas con su
-rezago recomendado. Las marcadas como *baja confianza* son las de precio con
-muchos huecos: su correlación puede ser frágil.
+Las que quedan **significativas** en un rezago disponible y con mecanismo, tras
+sacar tendencia y estacionalidad. Las de precio regulado van marcadas *baja
+confianza* por los huecos.
 """)
 
 code("""
@@ -416,13 +438,14 @@ for t in obj_d:
     sub = candidatas[(candidatas.target == t) & candidatas.candidata]
     print(f"\\n### {t}")
     if sub.empty:
-        print("  (sin candidatas significativas en rezagos disponibles)")
+        print("  (sin candidatas significativas con mecanismo)")
         continue
     for _, r in sub.iterrows():
-        signo = "+" if r.corr_disp > 0 else "−"
-        flag = "  ⚠ baja confianza" if r.confianza.startswith("baja") else ""
-        print(f"  {r.variable:22s}  rezago {r.mejor_rezago_disp:>2} meses  "
-              f"corr {signo}{abs(r.corr_disp):.2f}  (n={r.n_obs}){flag}")
+        c = r["corr"]
+        signo = "+" if c > 0 else "−"
+        flag = "  ⚠ baja confianza" if r["confianza"].startswith("baja") else ""
+        print(f"  {r['variable']:22s}  rezago {r['rezago_recomendado']:>2}  "
+              f"corr {signo}{abs(c):.2f}  (n={int(r['n_obs'])}){flag}")
 """)
 
 md("""
@@ -430,30 +453,28 @@ md("""
 
 - La **lista de candidatas con rezago recomendado** queda en
   `results/variables_candidatas.csv` (una fila por par variable–serie), con
-  columnas de origen (repo / SCRUM-25) y de confianza.
-- El criterio fue: correlación cruzada **significativa** (95%) en un rezago
-  **disponible** según la tabla de disponibilidad temporal.
-- **Las correlaciones son débiles en general** (la más alta ~0,4). En variación
-  mensual, estas variables no son predictores lineales fuertes de la
-  producción. Además, con 13 rezagos × 9 variables × 4 series hay **testeo
-  múltiple**: ~1 de cada 20 celdas cruza la banda por azar, así que las
-  "significativas" en rezagos largos y sin mecanismo (9–12) son sospechosas.
-  Hay que filtrar por mecanismo, no solo por el número.
-- La tabla de disponibilidad (`rezago_min`) se lee de `data/disponibilidad_variables.csv`; la cierra
-  SCRUM-26. Si cambia el rezago mínimo de una variable, se recalcula la
-  selección sin tocar nada más.
+  columnas de origen (repo / SCRUM-25), confianza y significancia.
+- Criterio: correlación cruzada **significativa** (95%) sobre series
+  diferenciadas y **desestacionalizadas**, en un rezago **disponible**
+  (SCRUM-26) y **con mecanismo** (0–3 o 12).
+- Tras sacar la estacionalidad, **varias correlaciones de pizarra se caen**
+  (eran estacionalidad común, no relación real). Las de precio de bioetanol se
+  sostienen más, pero son de **baja confianza** por los huecos. En general las
+  correlaciones son **débiles**: estas variables no son predictores lineales
+  fuertes de la producción en variación mensual.
+- La tabla de disponibilidad se lee de `data/disponibilidad_variables.csv`
+  (SCRUM-26); si cambia un `rezago_min`, la selección se recalcula sola.
 
-**Para el modelado (SCRUM-24 en adelante):**
+**Para el modelado (SCRUM-29 en adelante):**
 
-1. Entran al modelo las candidatas de cada serie, cada una en **su** rezago
-   recomendado (nunca en un rezago no disponible → evita fuga de información
-   futura en el walk-forward).
+1. Entran las candidatas de cada serie, cada una en **su** rezago recomendado
+   (nunca en un rezago no disponible → evita fuga de información futura).
 2. Las variables de **precio** están en pesos nominales y con huecos; probar
    versiones deflactadas y un criterio de relleno (ver `docs/fuentes_series.md`)
-   antes de descartarlas por ruido.
-3. Correlación ≠ causalidad ni ≠ mejora predictiva: la preselección reduce el
-   espacio de búsqueda, pero el aporte real de cada variable se mide con el
-   **mismo protocolo** (`evaluacion.py`) comparando el modelo con y sin ella.
+   antes de descartarlas.
+3. Correlación ≠ causalidad ≠ mejora predictiva: la preselección reduce el
+   espacio de búsqueda, pero el aporte real se mide con el **mismo protocolo**
+   (`evaluacion.py`) comparando el modelo con y sin cada variable.
 """)
 
 nb["cells"] = cells
