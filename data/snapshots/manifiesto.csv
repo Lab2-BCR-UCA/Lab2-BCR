@@ -1,0 +1,9 @@
+archivo_snapshot,fuente,fecha_descarga,hash_sha256,filas,origen
+produccion_biodiesel/2026-10-06.csv,produccion_biodiesel,2026-10-06,6604af677dd399b81e6754b14f09788ce5d94fc31eddeb36f542e7b19b2c6952,224,commit
+produccion_bioetanol/2026-10-06.csv,produccion_bioetanol,2026-10-06,9bfe2bf3e698a61311ddd94c7b3e446d57643f6f23f3ec3ec5381c1f267d1f3e,202,commit
+precios_biodiesel/2026-10-06.csv,precios_biodiesel,2026-10-06,744ef9d57bd0c8855583b1ac6c780ba3c6e9d72209653fd774f6bc49a93db9e0,77,commit
+precios_bioetanol/2026-10-06.csv,precios_bioetanol,2026-10-06,bbdd74e20a8c64c5903ae686edf4136e9ad57d6b61f9807752f81911d3552301,59,commit
+pizarra_cac/2026-10-06.csv,pizarra_cac,2026-10-06,5d71e6818f8b338fe5e243eafc4fb5a78847c3a0ab6e91643833094410e12364,105,commit
+tipo_cambio/2026-10-06.csv,tipo_cambio,2026-10-06,6c20f288eef2b7c4362e505199d17785c84335000a9f4c0683b4cb77f2bc61ae,105,commit
+combustibles/2026-10-12.csv,combustibles,2026-10-12,e2de7e727516e14ad7d1f537fcc3bb8d189de49984a96092494ecafb0d9a0132,200,commit
+molienda_soja/2026-10-12.csv,molienda_soja,2026-10-12,f1d0ed08d08ff635ef1bb5611ac2de9256f992d4cf923f02a93d4c5411dee1be,140,commit

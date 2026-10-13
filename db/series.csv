@@ -1,0 +1,27 @@
+serie_id,fuente,columna_origen,unidad,tipo,variable_disponibilidad,huecos_esperados,descripcion
+produccion_biodiesel_tn,produccion_biodiesel,produccion_tn,tn,objetivo,produccion_biodiesel,no,Producción de biodiesel
+biodiesel_ventas_corte_tn,produccion_biodiesel,ventas_corte_tn,tn,auxiliar,produccion_biodiesel,no,Ventas de biodiesel al corte obligatorio
+biodiesel_otras_ventas_tn,produccion_biodiesel,otras_ventas_mdo_interno_tn,tn,auxiliar,produccion_biodiesel,no,Otras ventas de biodiesel al mercado interno
+biodiesel_exportaciones_tn,produccion_biodiesel,exportaciones_tn,tn,auxiliar,produccion_biodiesel,no,Exportaciones de biodiesel
+produccion_bioetanol_total_m3,produccion_bioetanol,produccion_total_m3,m3,objetivo,produccion_bioetanol,no,Producción de bioetanol total
+produccion_bioetanol_maiz_m3,produccion_bioetanol,produccion_maiz_m3,m3,objetivo,produccion_bioetanol,no,Producción de bioetanol de maíz
+produccion_bioetanol_cana_m3,produccion_bioetanol,produccion_cana_m3,m3,objetivo,produccion_bioetanol,no,Producción de bioetanol de caña
+bioetanol_ventas_total_m3,produccion_bioetanol,ventas_total_m3,m3,auxiliar,produccion_bioetanol,no,Ventas de bioetanol total
+bioetanol_ventas_maiz_m3,produccion_bioetanol,ventas_maiz_m3,m3,auxiliar,produccion_bioetanol,no,Ventas de bioetanol de maíz
+bioetanol_ventas_cana_m3,produccion_bioetanol,ventas_cana_m3,m3,auxiliar,produccion_bioetanol,no,Ventas de bioetanol de caña
+precio_biodiesel_ars_tn,precios_biodiesel,precio_ars_tn,ARS/tn,externa,precio_biodiesel,si,Precio regulado del biodiesel
+precio_bioetanol_cana_ars_l,precios_bioetanol,precio_cana_ars_l,ARS/l,externa,precio_bioetanol_cana,si,Precio regulado del bioetanol de caña
+precio_bioetanol_maiz_ars_l,precios_bioetanol,precio_maiz_ars_l,ARS/l,externa,precio_bioetanol_maiz,si,Precio regulado del bioetanol de maíz
+precio_soja_pizarra_ars_tn,pizarra_cac,soja_ars_tn,ARS/tn,externa,precio_soja_pizarra,no,Precio de pizarra de soja (promedio mensual)
+precio_maiz_pizarra_ars_tn,pizarra_cac,maiz_ars_tn,ARS/tn,externa,precio_maiz_pizarra,no,Precio de pizarra de maíz (promedio mensual)
+tipo_cambio_promedio,tipo_cambio,tc_promedio_mes,ARS/USD,externa,tipo_cambio,no,Tipo de cambio oficial promedio del mes
+tipo_cambio_cierre,tipo_cambio,tc_cierre_mes,ARS/USD,externa,tipo_cambio,no,Tipo de cambio oficial al cierre del mes
+ventas_gasoil_grado1_m3,combustibles,gasoil_grado1_m3,m3,externa,ventas_gasoil,no,Ventas de gasoil grado 1
+ventas_gasoil_grado2_m3,combustibles,gasoil_grado2_m3,m3,externa,ventas_gasoil,no,Ventas de gasoil grado 2
+ventas_gasoil_grado3_m3,combustibles,gasoil_grado3_m3,m3,externa,ventas_gasoil,no,Ventas de gasoil grado 3
+ventas_nafta_grado1_m3,combustibles,nafta_grado1_m3,m3,externa,ventas_nafta,no,Ventas de nafta grado 1
+ventas_nafta_grado2_m3,combustibles,nafta_grado2_m3,m3,externa,ventas_nafta,no,Ventas de nafta grado 2
+ventas_nafta_grado3_m3,combustibles,nafta_grado3_m3,m3,externa,ventas_nafta,no,Ventas de nafta grado 3
+ventas_gasoil_total_m3,combustibles,ventas_gasoil_grados1a3_m3,m3,externa,ventas_gasoil,no,Ventas de gasoil grados 1 a 3
+ventas_nafta_total_m3,combustibles,ventas_nafta_grados1a3_m3,m3,externa,ventas_nafta,no,Ventas de nafta grados 1 a 3
+molienda_soja_tn,molienda_soja,molienda_soja_tn,tn,externa,molienda_soja,no,Molienda de soja
