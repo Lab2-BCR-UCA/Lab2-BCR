@@ -1,0 +1,9 @@
+fuente,archivo_origen,descripcion
+produccion_biodiesel,data/produccion_biodiesel.csv,"Producción y ventas de biodiesel (Secretaría de Energía)"
+produccion_bioetanol,data/produccion_bioetanol.csv,"Producción y ventas de bioetanol total, maíz y caña (Secretaría de Energía)"
+precios_biodiesel,data/biodiesel_precios.csv,"Precio regulado del biodiesel (Secretaría de Energía)"
+precios_bioetanol,data/bioetanol_precios.csv,"Precio regulado del bioetanol de caña y de maíz (Secretaría de Energía)"
+pizarra_cac,data/soja_maiz_cac_mensual.csv,"Precio de pizarra de soja y maíz (Cámara Arbitral de Cereales)"
+tipo_cambio,data/tipo_cambio_mensual.csv,"Tipo de cambio oficial USD/ARS (BCRA)"
+combustibles,variables_externas/data/combustibles_mensual.csv,"Ventas de gasoil y nafta por grado (Secretaría de Energía, SESCO)"
+molienda_soja,variables_externas/data/soja_mensual.csv,"Molienda mensual de soja (SAGyP)"
