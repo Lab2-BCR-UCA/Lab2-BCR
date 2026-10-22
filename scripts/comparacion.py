@@ -1,9 +1,16 @@
 """Arma la tabla comparativa de los modelos de referencia (integración 21/22/23).
 
-Junta las métricas de los baselines (SCRUM-22, `results/baselines.csv`) y del
-X-13 (SCRUM-23, `results/x13.csv`), que salen del mismo protocolo de
+Junta las métricas de los baselines (SCRUM-22, `results/baselines.csv`) y de
+las réplicas del X-13 (`results/x13.csv`), que salen del mismo protocolo de
 evaluación (SCRUM-21), en un único `results/comparacion.csv`. Es el "piso" a
 superar por los modelos propios.
+
+Modelos X-13 (ver scripts/replica_x13.py):
+    x13_bcr        config exacta de BCR (.spc) + su criterio de selección log/nivel
+    x13_bcr_sel12m idem, con el criterio calculado sobre los últimos 12 meses
+    x13_bcr_log    config BCR, siempre en log
+    x13_bcr_nivel  config BCR, siempre en nivel
+    x13_auto       réplica automática anterior (spec mínimo), como referencia
 
 Los dos CSV traen columnas algo distintas, así que se normalizan a un esquema
 común antes de concatenar.
@@ -23,7 +30,7 @@ import pandas as pd
 COMUNES = ["serie", "modelo", "inicio_test", "fin_test", "n_test",
            "MAE", "RMSE", "MAPE_pct", "acierto_signo_pct"]
 # orden de modelos en el resumen (de más simple a más complejo)
-ORDEN = ["naive", "naive_estacional", "x13"]
+ORDEN = ["naive", "naive_estacional", "x13_auto", "x13_bcr_log", "x13_bcr_nivel", "x13_bcr", "x13_bcr_sel12m"]
 
 
 def _normalizar(df: pd.DataFrame) -> pd.DataFrame:

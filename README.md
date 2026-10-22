@@ -85,33 +85,34 @@ acierto de signo.
 
 ```bash
 python scripts/baselines.py        # naive y naive estacional
-python scripts/replica_x13.py      # réplica del X-13 de la BCR (tarda unos minutos)
+python scripts/replica_x13.py      # réplica del X-13 de la BCR (~15 min; --procesos N para paralelizar)
 python scripts/comparar_bcr_x13.py ruta/al/BIOCOMBUSTIBLES.xlsx   # validación contra su corrida real
 python scripts/comparacion.py      # arma la tabla comparativa final
 ```
 
-La réplica del X-13 usa la **configuración real de la BCR** (sus archivos
-`.spc` en `spc/`): modelo ajustado desde 2013, corrección de días hábiles y
-Pascua, y los órdenes de su `automdl`. Con esto reproduce su corrida **exacta**
-(0,0 % de diferencia en la predicción y en la descomposición).
+La réplica del X-13 usa los **`.spc` reales de la BCR** (en `spc/`) tal cual:
+biodiesel y bioetanol, en log y en nivel, y aplica su **criterio de selección**
+(menor desvío de la variación log de la tendencia-ciclo). La BCR **no tiene un
+modelo fijo**: el ARIMA lo elige `automdl` en cada corrida. Con datos a julio
+2026 el pronóstico de agosto coincide con el de la BCR (0,0 %). Detalle,
+tratamiento de outliers y pendientes en `docs/x13_config_bcr.md`.
 
 ## Resultados (benchmark a superar)
 
 MAPE (%) por serie y modelo, test sep-2025 → ago-2026 (`results/comparacion.csv`):
 
-| Serie | naive | naive estacional | X-13 (config BCR) | Mejor |
-|---|---|---|---|---|
-| biodiesel | 18,2 | **15,8** | 21,0 | naive estacional |
-| bioetanol total | 10,3 | **5,0** | 7,8 | naive estacional |
-| bioetanol maíz | 6,6 | 6,6 | **6,0** | X-13 |
-| bioetanol caña | 28,4 | **15,5** | 16,4 | naive estacional |
+| Serie | naive | naive estacional | X-13 auto | X-13 BCR (log) | X-13 BCR (nivel) | X-13 BCR (criterio 12 m) | Mejor |
+|---|---|---|---|---|---|---|---|
+| biodiesel | 18,2 | **15,8** | 21,0 | 21,0 | 19,7 | 21,0 | naive estacional |
+| bioetanol total | 10,3 | **5,0** | 7,5 | 9,7 | 7,5 | 7,5 | naive estacional |
+| bioetanol maíz | 6,6 | 6,6 | 6,0 | 6,1 | 6,0 | **5,9** | X-13 BCR |
+| bioetanol caña | 28,4 | 15,5 | 16,4 | 15,4 | 16,4 | **15,0** | X-13 BCR |
 
-**Hallazgo central:** con su configuración real, el X-13 de la BCR es superado
-por un *naive estacional* en 3 de las 4 series. En biodiesel el modelo que
-elige la BCR **no tiene componente estacional** (un `(2 0 1)`), pese a que el
-EDA marca estacionalidad fuerte. Ahí está el margen de mejora que atacan los
-modelos propios (SARIMAX, ML, LSTM) sumando estacionalidad y variables
-externas (que la BCR hoy no usa).
+**Hallazgo central:** con su procedimiento real, el X-13 de la BCR es superado
+por un *naive estacional* en biodiesel y bioetanol total, y en maíz y caña
+gana por poco. Ajustar el X-13 (la elección log/nivel) mueve el MAPE 1-2
+puntos; el margen grande está en cambiar de modelo (SARIMAX, ML, LSTM) y
+sumar variables externas, que la BCR hoy no usa.
 
 ## Notebooks
 
