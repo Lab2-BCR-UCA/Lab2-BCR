@@ -1,10 +1,13 @@
 -- Base unificada del proyecto BCR (SCRUM-27).
 -- La base es un derivado: scripts/build_db.py la arma desde cero leyendo los
 -- archivos fechados de data/snapshots/. Ver db/README.md.
+-- Las variables derivadas (SCRUM-56) se calculan en el armado a partir de las
+-- crudas y se versionan igual que ellas.
 
 PRAGMA foreign_keys = ON;
 
--- Fuentes de datos: un archivo CSV del repo por fuente.
+-- Fuentes de datos: un archivo CSV del repo por fuente. Las derivadas
+-- cuelgan de una fuente fija, 'derivadas', que agrega el armado.
 CREATE TABLE fuentes (
     fuente          TEXT PRIMARY KEY,
     archivo_origen  TEXT NOT NULL,
@@ -13,6 +16,8 @@ CREATE TABLE fuentes (
 
 -- Catálogo de series: una fila por variable mensual.
 -- rezago_min se copia de data/disponibilidad_variables.csv (SCRUM-26).
+-- Las crudas salen de db/series.csv y las derivadas de db/derivadas.csv; en
+-- las derivadas, columna_origen es el nombre de la función que las calcula.
 CREATE TABLE series (
     serie_id                TEXT PRIMARY KEY,
     fuente                  TEXT NOT NULL REFERENCES fuentes(fuente),
@@ -22,20 +27,46 @@ CREATE TABLE series (
     variable_disponibilidad TEXT NOT NULL,
     rezago_min              INTEGER NOT NULL CHECK (rezago_min >= 0),
     huecos_esperados        INTEGER NOT NULL CHECK (huecos_esperados IN (0, 1)),
+    clase                   TEXT NOT NULL CHECK (clase IN ('cruda', 'derivada')),
+    relleno                 TEXT NOT NULL CHECK (relleno IN ('ffill', 'ninguno')),
     descripcion             TEXT
+);
+
+-- Insumos de cada serie derivada.
+CREATE TABLE series_insumos (
+    serie_id        TEXT NOT NULL REFERENCES series(serie_id),
+    insumo_serie_id TEXT NOT NULL REFERENCES series(serie_id),
+    PRIMARY KEY (serie_id, insumo_serie_id)
 );
 
 -- Cada versión cargada de cada fuente. Una descarga nueva con datos
 -- distintos agrega una fila; nunca se pisa una anterior.
+-- Las versiones de una derivada (origen = 'derivada') no tienen archivo:
+-- se recalculan en cada armado. serie_derivada dice de qué derivada son.
 CREATE TABLE descargas (
     descarga_id      INTEGER PRIMARY KEY,
     fuente           TEXT NOT NULL REFERENCES fuentes(fuente),
     fecha_descarga   TEXT NOT NULL,          -- YYYY-MM-DD
-    archivo_snapshot TEXT NOT NULL UNIQUE,   -- ruta dentro de data/snapshots/
+    archivo_snapshot TEXT UNIQUE,            -- ruta dentro de data/snapshots/; NULL en derivadas
     hash_sha256      TEXT NOT NULL,
     filas            INTEGER NOT NULL,
-    origen           TEXT NOT NULL CHECK (origen IN ('commit', 'carga')),
-    UNIQUE (fuente, hash_sha256)
+    origen           TEXT NOT NULL CHECK (origen IN ('commit', 'carga', 'derivada')),
+    serie_derivada   TEXT REFERENCES series(serie_id),
+    CHECK ((origen = 'derivada') = (archivo_snapshot IS NULL)),
+    CHECK ((origen = 'derivada') = (serie_derivada IS NOT NULL))
+);
+
+-- En las crudas un mismo contenido no se guarda dos veces. En las derivadas
+-- una versión puede volver a un valor anterior, así que no aplica.
+CREATE UNIQUE INDEX idx_descargas_hash ON descargas (fuente, hash_sha256)
+    WHERE origen <> 'derivada';
+
+-- Linaje: con qué versiones de los insumos se calculó cada versión de una
+-- derivada.
+CREATE TABLE descargas_insumos (
+    descarga_id        INTEGER NOT NULL REFERENCES descargas(descarga_id),
+    insumo_descarga_id INTEGER NOT NULL REFERENCES descargas(descarga_id),
+    PRIMARY KEY (descarga_id, insumo_descarga_id)
 );
 
 -- Los datos, en formato largo: una fila por serie, mes y versión.
