@@ -155,6 +155,42 @@ régimen de la Ley 27.640. El corte de noviembre 2025 cae dentro del
 holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a agosto
 2026. Con 2 y 10 meses, esos subperíodos son descriptivos, no inferenciales.
 
+### Resultados con datos a agosto 2026
+
+`python scripts/protocolo_largo.py`. MAPE (%):
+
+| Serie | Ventana | naive | naive estacional | x13_auto | x13_bcr | x13_bcr_sel12m |
+|---|---|---|---|---|---|---|
+| Biodiesel | backtest | **24,9** | 73,6 | 32,2 | 39,0 | 34,3 |
+| Biodiesel | holdout | 18,2 | **15,8** | 21,0 | 19,7 | 21,0 |
+| Bioetanol total | backtest | 8,5 | 12,6 | **7,8** | **7,8** | **7,8** |
+| Bioetanol total | holdout | 10,3 | **5,0** | 7,5 | 7,5 | 7,5 |
+| Bioetanol maíz | backtest | 9,5 | 15,7 | **8,6** | **8,6** | 8,7 |
+| Bioetanol maíz | holdout | 6,6 | 6,6 | 6,0 | 6,0 | **5,9** |
+| Bioetanol caña | backtest | 25,9 | 28,1 | 20,8 | 20,8 | **18,4** |
+| Bioetanol caña | holdout | 28,4 | 15,5 | 16,4 | 16,4 | **15,0** |
+
+Lectura:
+
+- **En el backtest, el X-13 de BCR le gana al naive estacional en las
+  cuatro series y el intervalo no incluye el cero** en ninguna variante.
+  Diebold-Mariano da p ≤ 0,04 en biodiesel, bioetanol total y maíz, y entre
+  0,02 y 0,07 en caña según la variante.
+- **En el holdout, ningún intervalo excluye el cero** salvo dos casos en
+  contra del modelo: X-13 en log en bioetanol total y el naive en caña son
+  peores que el naive estacional. Con 12 meses no se puede distinguir
+  ningún modelo, que es justamente lo que motivó este protocolo.
+- El naive estacional de biodiesel da 73,6 % en el backtest por la caída de
+  producción de 2023: predice cada mes con el mismo mes de 2022, que tenía
+  más de 160 mil toneladas, y la producción real bajó a entre 20 y 60 mil.
+  No es un error de cálculo. Por eso en biodiesel el naive (mes anterior)
+  queda como el mejor modelo del backtest.
+- Ordenar modelos por el holdout lleva a conclusiones distintas que el
+  backtest. La comparación para decidir es la del backtest.
+
+Detalle completo: `results/protocolo_metricas.csv` y
+`results/protocolo_diferencias.csv`.
+
 ## 7. Escala de evaluación
 
 Las predicciones se evalúan en las unidades originales de producción.
