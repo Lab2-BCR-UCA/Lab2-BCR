@@ -1,3 +1,3 @@
-serie,mi_pronostico,bcr_winx13,real_publicado,dif_vs_bcr_pct
-biodiesel,96592,103922,146604,-7.1
-bioetanol_total,140394,140394,139521,0.0
+serie,variante,mi_pronostico,bcr_winx13,real_publicado,dif_vs_bcr_pct
+biodiesel,log,103923,103922,146604,0.0
+bioetanol_total,nivel,140394,140394,139521,-0.0

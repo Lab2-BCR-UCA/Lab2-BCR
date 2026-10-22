@@ -56,7 +56,7 @@ def descomponer(serie: pd.Series, log: bool) -> pd.DataFrame:
     data = "\n".join("  " + " ".join(f"{v:.3f}" for v in vals[i:i + 10])
                      for i in range(0, len(vals), 10))
     tr = "log" if log else "none"
-    # Misma config que el .spc real de BCR (ver referencia/spc/): modelo desde
+    # Misma config que el .spc real de BCR (ver spc/): modelo desde
     # 2013, corrección de días hábiles y Pascua, y los órdenes del automdl.
     modelspan = "  modelspan=(2013.1, )\n" if (primero.year, primero.month) <= (2013, 1) else ""
     spec = (
