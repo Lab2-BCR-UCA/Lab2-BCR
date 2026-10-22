@@ -15,7 +15,7 @@ SCRUM-26).
 |---|---|---|---|---|---|---|
 | Precio regulado bioetanol de maíz | Precio de venta de la industria; determina rentabilidad | Secretaría de Energía (resolución) | Mensual | 2018-06 a 2026-09 | **0** | Ya en el repo (`data/bioetanol_precios.csv`) |
 | Precio regulado bioetanol de caña | Ídem, para la fracción de caña | Secretaría de Energía (resolución) | Mensual | 2018-06 a 2026-09 | **0** | Ya en el repo (`data/bioetanol_precios.csv`) |
-| Margen del bioetanol de maíz | Si el precio regulado no cubre el costo del maíz, cae el incentivo a producir | Derivada (precio regulado / pizarra de maíz) | Mensual | 2018-06 a 2026-09 | **0** | **Nuevo** (`scripts/margen_bioetanol.py` → `data/margen_bioetanol.csv`) |
+| Margen del bioetanol de maíz | Si el precio regulado no cubre el costo del maíz, cae el incentivo a producir | Derivada (precio regulado / pizarra de maíz) | Mensual | 2018-06 a 2026-09 | **0** | **Nuevo**, en la base como variable derivada (`scripts/derivadas.py`, `db/derivadas.csv`) |
 | Ventas de nafta | Volumen sobre el que se aplica el corte de bioetanol | Secretaría de Energía (SESCO) | Mensual | ya relevada | **0** | Ya en el repo (`data/` combustibles) |
 
 ### Regla de huecos de los precios regulados
@@ -23,12 +23,10 @@ SCRUM-26).
 El precio regulado del bioetanol tiene **41 meses sin fila** entre 2018-06 y
 2026-09 (59 filas en un span de 100 meses): solo cambia por resolución y sigue
 vigente hasta la siguiente. El relleno (arrastrar el último valor vigente)
-**no se hace en este script**: es una regla del **mecanismo de derivadas
-(SCRUM-56)**, que se declara una vez en `db/series.csv` y el build la aplica a
-todas las derivadas que usen esos precios. `margen_bioetanol.py` solo calcula
-la fórmula sobre los insumos que recibe; cuando esté el 56, la fórmula pasa a
-`scripts/derivadas.py` y se registra en `db/derivadas.csv` (sin tocar
-`build_db.py`).
+es una regla del **mecanismo de derivadas (SCRUM-56)**: está declarado una vez
+en `db/series.csv` (`relleno = ffill`) y el armado de la base lo aplica a todas
+las derivadas que usen esos precios. La fórmula del margen no rellena por su
+cuenta. Ver la sección "Variables derivadas" de [`db/README.md`](../db/README.md).
 
 ### Margen del bioetanol de maíz
 
@@ -46,10 +44,17 @@ margen_bioetanol_maiz = precio_regulado_maiz [$/l] / (precio_maiz_pizarra [$/tn]
   cancela: no hace falta deflactar con IPC.
 - **Limitación:** no incluye otros costos (enzimas, energía, mano de obra),
   así que un cociente apenas por encima de 1 puede ser margen negativo real.
-- Resultado con datos a 2026-09, **sin relleno** (solo los meses con resolución
-  vigente): 59 meses (2018-06 a 2026-09), margen medio 1,33, mínimo 0,98,
-  máximo 1,65; 2 meses con margen < 1. Cuando el mecanismo de derivadas (56)
-  aplique el relleno, la serie pasa a cubrir los 100 meses.
+- Se calcula en la base como variable derivada (`margen_bioetanol_maiz` en
+  `scripts/derivadas.py`, registrada en `db/derivadas.csv`), versionada junto
+  con sus insumos. Para leerla: `leer_dataset()["margen_bioetanol_maiz"]`.
+- Resultado con datos a 2026-09, con el relleno del precio regulado: 100 meses
+  (2018-06 a 2026-09), margen medio 1,24, mínimo 0,51, máximo 1,65; 14 meses
+  con margen < 1.
+- Los meses con margen < 1 caen todos en períodos sin resolución nueva
+  mientras el maíz subía: septiembre a diciembre de 2020, enero a marzo de
+  2022 y agosto de 2023 a enero de 2024 (tras la devaluación). Es la señal que
+  busca la variable: precio regulado atrasado contra el costo, como en
+  biodiesel en 2020. Sin relleno esos meses no aparecían (el mínimo era 0,98).
 
 ## Variable descartada
 

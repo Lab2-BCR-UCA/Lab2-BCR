@@ -33,4 +33,26 @@ Las constantes de cada fórmula van con nombre y documentadas como supuesto.
 
 from __future__ import annotations
 
-import pandas as pd  # noqa: F401  (lo usan las firmas de las funciones)
+import pandas as pd
+
+
+# ------------------------------------------------------------------ bioetanol
+
+# Rinde aproximado de etanol por tonelada de maíz (molienda seca, ~0,40 l/kg).
+# Supuesto: solo fija la escala del ratio, no su poder predictivo.
+RINDE_L_POR_TN = 400.0
+
+
+def margen_bioetanol_maiz(insumos: pd.DataFrame) -> pd.Series:
+    """Margen doméstico del bioetanol de maíz (SCRUM-52), adimensional.
+
+        precio regulado [ARS/l] / (pizarra de maíz [ARS/tn] / RINDE_L_POR_TN [l/tn])
+
+    Cociente de dos valores en pesos del mismo mes: la inflación se cancela y
+    no hace falta deflactar. Un valor menor a 1 indica que el precio regulado
+    no cubre el costo del maíz. No incluye otros costos (enzimas, energía), así
+    que un valor apenas por encima de 1 puede ser margen negativo en la práctica.
+    Los huecos del precio regulado los rellena el mecanismo (relleno = ffill).
+    """
+    costo_maiz_por_litro = insumos["precio_maiz_pizarra_ars_tn"] / RINDE_L_POR_TN
+    return insumos["precio_bioetanol_maiz_ars_l"] / costo_maiz_por_litro

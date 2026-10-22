@@ -84,9 +84,10 @@ Vistas:
 | `v_ultima_version` | Para cada serie y mes, el valor de la descarga más reciente. Formato largo. |
 | `v_dataset_mensual` | Lo mismo, una fila por mes y una columna por serie. Se genera desde el catálogo, así una serie nueva aparece sola. |
 
-Hoy son 8 fuentes y 26 series: 4 objetivo (biodiesel y bioetanol total, de
-maíz y de caña), 6 auxiliares (ventas y exportaciones del mismo archivo de
-producción) y 16 externas.
+Hoy son 8 fuentes y 27 series: 26 crudas (4 objetivo, que son biodiesel y
+bioetanol total, de maíz y de caña; 6 auxiliares, que son ventas y
+exportaciones del mismo archivo de producción; y 16 externas) y 1 derivada, el
+margen del bioetanol de maíz (SCRUM-52).
 
 ### Consultas útiles
 

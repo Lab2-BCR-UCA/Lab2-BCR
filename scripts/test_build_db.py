@@ -39,6 +39,8 @@ def _copiar_repo(destino: Path) -> None:
 
 def _construir(raiz: Path, fecha: str) -> dict:
     _, resumen = build_db.actualizar(raiz, raiz / "data" / "bcr.db", fecha)
+    # Versiones de las fuentes crudas, sin contar las de las derivadas.
+    resumen["descargas_crudas"] = resumen["descargas"] - resumen["versiones_derivadas"]
     return resumen
 
 
@@ -55,17 +57,18 @@ def main() -> None:
 
         # 1. Primera carga desde cero.
         r1 = _construir(raiz, "2026-10-01")
-        assert r1["series"] == 26 and r1["descargas"] == 8, r1
+        n_series = len(pd.read_csv(raiz / "db" / "series.csv")) + len(pd.read_csv(raiz / "db" / "derivadas.csv"))
+        assert r1["series"] == n_series and r1["descargas_crudas"] == 8, r1
         print(f"ok  primera carga: {r1['series']} series, {r1['observaciones']} observaciones")
 
         # Sin cambios en los CSV no se crea ninguna versión nueva.
         r1b = _construir(raiz, "2026-10-02")
-        assert r1b["descargas"] == 8, r1b
+        assert r1b["descargas"] == r1["descargas"], r1b
         print("ok  sin cambios no se agregan versiones")
 
         # Un CSV con saltos de línea de Windows no cuenta como versión nueva.
         csv_bd.write_bytes(csv_bd.read_bytes().replace(b"\n", b"\r\n"))
-        assert _construir(raiz, "2026-10-02")["descargas"] == 8
+        assert _construir(raiz, "2026-10-02")["descargas"] == r1["descargas"]
         print("ok  CRLF no genera una versión falsa")
 
         # 2. Segunda descarga: la Secretaría revisa julio y publica septiembre.
@@ -76,7 +79,7 @@ def main() -> None:
         pd.concat([df, nueva]).to_csv(csv_bd, index=False)
 
         r2 = _construir(raiz, "2026-11-05")
-        assert r2["descargas"] == 9, r2
+        assert r2["descargas_crudas"] == 9, r2
         versiones = _consulta(raiz,
             "SELECT d.fecha_descarga, o.valor FROM observaciones o JOIN descargas d USING (descarga_id) "
             "WHERE o.serie_id = 'produccion_biodiesel_tn' AND o.fecha = '2026-07-01' ORDER BY 1")
@@ -108,14 +111,14 @@ def main() -> None:
             raise AssertionError("debería haber fallado por el valor negativo")
         except ValueError as e:
             assert "negativos" in str(e), e
-        assert _consulta(raiz, "SELECT COUNT(*) FROM descargas") == [(9,)]
+        assert _consulta(raiz, "SELECT COUNT(*) FROM descargas") == [(r2["descargas"],)]
         assert manifiesto.read_bytes() == manifiesto_antes
         assert sorted((raiz / "data" / "snapshots").rglob("*.csv")) == copias_antes
         print("ok  un negativo frena la carga; la base, el manifiesto y las copias no cambian")
 
         # Corregido el dato, la carga siguiente funciona normalmente.
         csv_bd.write_bytes(csv_valido)
-        assert _construir(raiz, "2026-12-01")["descargas"] == 9
+        assert _construir(raiz, "2026-12-01")["descargas_crudas"] == 9
         print("ok  después de una carga fallida la siguiente funciona")
 
         # Un mes faltante en una serie sin huecos esperados también frena la carga.
@@ -187,7 +190,7 @@ def probar_derivadas() -> None:
 
         # 1. La derivada aparece en la base y en la vista, calculada con el relleno.
         r1 = _construir(raiz, "2026-10-01")
-        assert r1["series"] == 27 and r1["versiones_derivadas"] == 1, r1
+        assert r1["series"] == 27 and r1["versiones_derivadas"] == 1, r1  # 26 crudas + la de prueba
         grilla = pd.date_range(precios.index.min(), precios.index.max(), freq="MS")
         hueco = grilla.difference(precios.index)[0]
         esperado = precios["precio_maiz_ars_l"].reindex(grilla).ffill()[hueco] / maiz[hueco]
