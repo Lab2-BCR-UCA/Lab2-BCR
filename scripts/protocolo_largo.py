@@ -77,8 +77,8 @@ MODELOS = {
     "x13_auto": ("auto", None),
     "x13_bcr_log": ("bcr", "log"),
     "x13_bcr_nivel": ("bcr", "nivel"),
-    "x13_bcr": ("bcr", "elegido"),
-    "x13_bcr_sel12m": ("bcr", "elegido_12m"),
+    "x13_bcr_selcompleta": ("bcr", "elegido"),
+    "x13_bcr": ("bcr", "elegido_12m"),  # el criterio que reproduce a BCR
 }
 
 

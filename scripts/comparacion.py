@@ -6,8 +6,9 @@ evaluación (SCRUM-21), en un único `results/comparacion.csv`. Es el "piso" a
 superar por los modelos propios.
 
 Modelos X-13 (ver scripts/replica_x13.py):
-    x13_bcr        config exacta de BCR (.spc) + su criterio de selección log/nivel
-    x13_bcr_sel12m idem, con el criterio calculado sobre los últimos 12 meses
+    x13_bcr             config exacta de BCR (.spc) + su criterio de selección
+                        log/nivel sobre los últimos 12 meses (reproduce a BCR)
+    x13_bcr_selcompleta idem, con el criterio calculado sobre toda la serie
     x13_bcr_log    config BCR, siempre en log
     x13_bcr_nivel  config BCR, siempre en nivel
     x13_auto       réplica automática anterior (spec mínimo), como referencia
@@ -30,7 +31,7 @@ import pandas as pd
 COMUNES = ["serie", "modelo", "inicio_test", "fin_test", "n_test",
            "MAE", "RMSE", "MAPE_pct", "acierto_signo_pct"]
 # orden de modelos en el resumen (de más simple a más complejo)
-ORDEN = ["naive", "naive_estacional", "x13_auto", "x13_bcr_log", "x13_bcr_nivel", "x13_bcr", "x13_bcr_sel12m"]
+ORDEN = ["naive", "naive_estacional", "x13_auto", "x13_bcr_log", "x13_bcr_nivel", "x13_bcr_selcompleta", "x13_bcr"]
 
 
 def _normalizar(df: pd.DataFrame) -> pd.DataFrame:

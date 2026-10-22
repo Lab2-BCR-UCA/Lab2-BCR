@@ -94,9 +94,10 @@ El equipo confirmó que su evaluación de X-13 también realiza
 12 predicciones a un mes, reajustando el modelo en cada iteración
 con forecast maxlead=1.
 
-Este backtest supone que el dato del mes anterior está disponible.
-Se debe confirmar si este supuesto reproduce el retraso de publicación
-de la Secretaría de Energía y el momento de predicción de la BCR.
+Este backtest supone que el dato del mes anterior está disponible. Está
+confirmado: al estimar el mes t, el último dato de producción que tiene la
+BCR es t-1 (mail de la BCR del 9/10; ver `docs/disponibilidad_temporal.md`,
+SCRUM-26).
 
 ## 6. Prevención del uso de información futura
 
@@ -126,6 +127,11 @@ la diferencia de pérdida mes a mes, d_t = pérdida(modelo) - pérdida(naive
 estacional). Negativa significa que el modelo tiene menos error. Se
 reportan dos pérdidas: error absoluto porcentual (la del MAPE) y error
 absoluto (la del MAE).
+
+Estos intervalos son de la **diferencia de error entre dos modelos**, para
+saber si uno le gana al otro. No son intervalos de predicción: los
+intervalos 80/95 de cada pronóstico los produce cada modelo (SCRUM-29 y
+SCRUM-54).
 
 Para cada diferencia se informan:
 
@@ -157,9 +163,12 @@ holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a agosto
 
 ### Resultados con datos a agosto 2026
 
-`python scripts/protocolo_largo.py`. MAPE (%):
+`python scripts/protocolo_largo.py`. MAPE (%). `x13_bcr` es la
+variante que reproduce a BCR (criterio log/nivel sobre los últimos 12
+meses: log en biodiesel, nivel en bioetanol); `x13_bcr_selcompleta` aplica
+el criterio sobre toda la serie y en biodiesel termina eligiendo nivel.
 
-| Serie | Ventana | naive | naive estacional | x13_auto | x13_bcr | x13_bcr_sel12m |
+| Serie | Ventana | naive | naive estacional | x13_auto | x13_bcr_selcompleta | x13_bcr |
 |---|---|---|---|---|---|---|
 | Biodiesel | backtest | **24,9** | 73,6 | 32,2 | 39,0 | 34,3 |
 | Biodiesel | holdout | 18,2 | **15,8** | 21,0 | 19,7 | 21,0 |
@@ -338,12 +347,29 @@ No hubo valores reales iguales a cero en el período evaluado.
 
 ## 13. Pendientes de confirmación
 
-- Alinear con X-13 los inicios de entrenamiento y la versión de los datos.
-- Confirmar el origen y significado de la columna provisorio.
-- Confirmar la fecha de emisión de la predicción y el retraso de publicación.
+Ya confirmados:
+
+- Retraso de publicación: al estimar t, el último dato de producción es t-1
+  (mail de la BCR del 9/10, SCRUM-26).
+- Configuración de X-13 de la BCR: se usan sus cuatro `.spc` y la réplica
+  coincide con los 12 pronósticos de su Excel (SCRUM-41).
+- Los últimos 12 meses figuran siempre como provisorios, según confirmó la
+  BCR. Por eso el holdout se informa como provisorio.
+- Reunión con la BCR del 20/10: la BCR quiere **un número concreto, sin
+  rangos**, y lo que más pesa no es el valor del índice sino el **poder
+  explicativo** de las variables. El pronóstico puntual es el entregable;
+  los intervalos de predicción quedan como apoyo interno.
+
+Pendientes:
+
+- Alinear con X-13 los inicios de entrenamiento: hoy `x13_bcr` usa el
+  inicio de sus `.spc` (2010 en bioetanol total y caña) y los demás modelos
+  el de la sección 4. La diferencia está documentada en
+  `docs/x13_config_bcr.md`.
+- Confirmar con la BCR la ventana del criterio de selección log/nivel.
+  `x13_bcr` usa los últimos 12 meses porque reproduce su elección;
+  `x13_bcr_selcompleta` usa toda la serie.
 - Confirmar la serie sobre la que la BCR requiere medir el acierto de signo.
-- Obtener la configuración de X-13 de la BCR y su archivo .spc,
-  si se requiere reproducir exactamente su procedimiento.
 
 La ventana de test y el procedimiento walk-forward a un mes
 ya fueron acordados con el equipo.
