@@ -76,8 +76,10 @@ Con la serie completa, el criterio elige nivel en biodiesel, al revés que BCR. 
 
 No damos por confirmado que BCR use 12 meses: es la ventana que reproduce su elección, no algo que sepamos. Por eso se guardan las dos versiones:
 
-- `x13_bcr`: criterio sobre la serie completa;
-- `x13_bcr_sel12m`: criterio sobre los últimos 12 meses.
+- `x13_bcr`: criterio sobre los últimos 12 meses. Es la variante de
+  referencia, porque reproduce la elección de BCR (log en biodiesel, nivel en
+  bioetanol);
+- `x13_bcr_selcompleta`: criterio sobre la serie completa.
 
 **Pendiente:** confirmar con BCR (o con el Excel) la ventana exacta.
 
@@ -108,7 +110,7 @@ Protocolo de `docs/protocolo_evaluacion.md`: test de septiembre 2025 a agosto 20
 
 MAPE (%):
 
-| Serie | naive estacional | x13_auto | x13_bcr_log | x13_bcr_nivel | x13_bcr | x13_bcr_sel12m |
+| Serie | naive estacional | x13_auto | x13_bcr_log | x13_bcr_nivel | x13_bcr_selcompleta | x13_bcr |
 |---|---|---|---|---|---|---|
 | Biodiesel | **15,8** | 21,0 | 21,0 | 19,7 | 19,7 | 21,0 |
 | Bioetanol total | **5,0** | 7,5 | 9,7 | 7,5 | 7,5 | 7,5 |
@@ -125,9 +127,9 @@ Tabla completa (MAE, RMSE, MAPE, acierto de signo): `results/x13.csv` y `results
 - Lo que agrega el `.spc` y no tenía el spec mínimo no cambia el pronóstico del regARIMA: `seasonalma = MSR`, `maxiter`, `check`, `slidingspans`, `spectrum` y el `span` desde 2010.
 - La diferencia que importa viene de la **elección log/nivel**.
 
-**Aplicando el procedimiento exacto de BCR (`x13_bcr_sel12m`), el X-13 sigue perdiendo contra el naive estacional** en biodiesel y bioetanol total. En maíz y caña queda apenas por delante.
+**Aplicando el procedimiento exacto de BCR (`x13_bcr`), el X-13 sigue perdiendo contra el naive estacional** en biodiesel y bioetanol total. En maíz y caña queda apenas por delante.
 
-Con el criterio sobre la serie completa (`x13_bcr`), biodiesel pasa a nivel y mejora a 19,7 %, pero sigue peor que el naive estacional.
+Con el criterio sobre la serie completa (`x13_bcr_selcompleta`), biodiesel pasa a nivel y mejora a 19,7 %, pero sigue peor que el naive estacional.
 
 **Conclusión:** casi todo el margen de mejora está en cambiar de modelo, no en ajustar el X-13. Esa es la comparación que permite distinguir las dos fuentes de ganancia.
 

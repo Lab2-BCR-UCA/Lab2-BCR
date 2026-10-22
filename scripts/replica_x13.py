@@ -13,9 +13,11 @@ Hay dos réplicas, que se guardan juntas pero con nombres de modelo distintos:
     inline. En cada iteración corre la versión en log (``_L``) y en nivel
     (``_N``) y aplica el **criterio de selección de BCR**: se queda con la que
     tiene menor desvío estándar de la variación logarítmica mensual de la
-    serie filtrada por estacionalidad e irregular (tendencia-ciclo, tabla D12).
-    También se guardan la selección con el criterio calculado sobre los
-    últimos 12 meses (``x13_bcr_sel12m``) y las dos variantes fijas
+    serie filtrada por estacionalidad e irregular (tendencia-ciclo, tabla D12),
+    calculado sobre los últimos 12 meses, que es la ventana que reproduce la
+    elección de BCR (log en biodiesel, nivel en bioetanol).
+    También se guardan la selección con el criterio calculado sobre toda la
+    serie (``x13_bcr_selcompleta``) y las dos variantes fijas
     (``x13_bcr_log`` y ``x13_bcr_nivel``) para ver cuánto aporta la selección.
 
 ``x13_auto`` — réplica automática anterior (referencia)
@@ -375,7 +377,7 @@ def walk_forward(series: dict[str, pd.Series], procesos: int) -> None:
             if i % 10 == 0 or i == len(tareas):
                 print(f"  {i}/{len(tareas)}", flush=True)
 
-    modelos = [("x13_bcr", "bcr", "seleccion"), ("x13_bcr_sel12m", "bcr", "seleccion_12m"),
+    modelos = [("x13_bcr", "bcr", "seleccion_12m"), ("x13_bcr_selcompleta", "bcr", "seleccion"),
                ("x13_bcr_log", "bcr", "log"),
                ("x13_bcr_nivel", "bcr", "nivel"), ("x13_auto", "auto", "")]
     detalles, resumenes, seleccion = [], [], []
