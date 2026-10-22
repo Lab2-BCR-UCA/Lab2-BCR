@@ -55,7 +55,7 @@ Para bioetanol total y caña, ese inicio difiere del inicio del protocolo (2013-
 
 Los 12 pronósticos (agosto 2026 a julio 2027) de las dos variantes de cada serie están en `results/pronostico_x13_bcr_2026-07.csv`.
 
-**Pendiente:** compararlos con los 12 del Excel de BCR. Por ahora solo tenemos el de agosto de cada serie.
+**Verificado contra el Excel de BCR** (`data/modelo_bcr_biocombustibles.xlsx`): los 12 pronósticos coinciden en las dos series (biodiesel en log y bioetanol total en nivel), con una diferencia máxima menor a 0,00001 %. El Excel trae las predicciones como índice base 2013 = 100; se pasan a toneladas y m³ con el factor de la fila 2 de cada bloque (celdas C2 y P2).
 
 ## 3. Criterio de selección log / nivel
 
@@ -163,6 +163,5 @@ python scripts/comparacion.py                 # regenera results/comparacion.csv
 
 ## 7. Pendientes
 
-- Comparar los 12 pronósticos de julio 2026 contra el Excel de BCR.
 - Confirmar la ventana del criterio de selección.
 - Evaluar en el holdout de SCRUM-43. No está definido en el repo.
