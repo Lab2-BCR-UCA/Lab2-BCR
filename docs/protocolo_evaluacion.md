@@ -1,7 +1,7 @@
 # Protocolo de evaluación de modelos
 
-Estado: ventana de test acordada con el equipo. Pendiente de revisión
-de los demás criterios y de las confirmaciones indicadas para la BCR.
+Estado: protocolo largo (SCRUM-43) con backtest de selección y holdout
+final. Pendientes de confirmación con la BCR en la sección 13.
 
 ## 1. Objetivo
 
@@ -17,16 +17,35 @@ de producción mensual de biocombustibles en igualdad de condiciones.
 
 Las métricas se calcularán por separado para cada serie.
 
-## 3. Período de test
+## 3. Ventanas de evaluación
 
-Se utiliza septiembre de 2025 a agosto de 2026, inclusive: 12 meses.
+Con 12 meses de test no se puede distinguir ningún modelo: en las cuatro
+series el intervalo de la diferencia de error entre X-13 y naive estacional
+incluye el cero. Por eso la evaluación se divide en dos ventanas:
 
-Esta ventana fue acordada con el equipo para comparar los modelos simples
-con la evaluación de X-13 ya realizada. Comprende un ciclo anual completo.
+| Ventana | Meses (datos a agosto 2026) | Para qué se usa |
+|---|---|---|
+| Backtest de selección | septiembre 2021 a agosto 2025 (48 meses) | Todas las decisiones: variables, rezagos, hiperparámetros y modelo final. |
+| Holdout final | septiembre 2025 a agosto 2026 (12 meses) | Confirmar al final. No se usa para decidir nada. |
 
-Los 12 meses están marcados como provisorios en los CSV utilizados.
-Se incluyen por acuerdo del equipo y se conserva esta condición en los
-resultados. Las métricas pueden cambiar si se revisan los datos reales.
+Reglas:
+
+- El backtest empieza siempre en septiembre 2021 y termina 12 meses antes
+  del último dato. El holdout son los últimos 12 meses. Cuando llega un mes
+  nuevo, las dos ventanas se corren un mes. Lo calcula
+  `ventanas_protocolo()` en `scripts/evaluacion.py`.
+- El holdout se corre una sola vez, con el modelo ya elegido. Si se mira el
+  holdout para cambiar algo, deja de ser holdout. Para trabajar se usa
+  `python scripts/protocolo_largo.py --sin-holdout`.
+- Los baselines y el X-13 de BCR sí se reportan en el holdout porque no se
+  eligen: son las referencias contra las que se compara el modelo final.
+- La ventana anterior de 12 meses (septiembre 2025 a agosto 2026) coincide
+  con el holdout, así que los resultados viejos de `results/x13.csv` y
+  `results/baselines.csv` siguen siendo comparables.
+
+Los 12 meses del holdout están marcados como provisorios en los CSV, como
+confirmó la BCR. Se mantienen y se informan siempre como provisorios: las
+métricas pueden cambiar cuando se revisen los datos reales.
 
 Todos los modelos deben evaluarse sobre los mismos meses y la misma
 versión de los datos. Una actualización de las fuentes requerirá volver
@@ -63,8 +82,13 @@ Para cada mes del test:
 3. Guardar la predicción y el valor real.
 4. Incorporar el valor real al entrenamiento de la siguiente iteración.
 
-Primera predicción: septiembre de 2025, entrenando hasta agosto de 2025.
-Última predicción: agosto de 2026, entrenando hasta julio de 2026.
+Se aplica igual en las dos ventanas, con el mismo código de modelo
+(`evaluar_ventanas()` llama a `evaluar_modelo()` en cada una):
+
+- Backtest: primera predicción septiembre 2021, entrenando hasta agosto 2021;
+  última, agosto 2025.
+- Holdout: primera predicción septiembre 2025, entrenando hasta agosto 2025;
+  última, agosto 2026, entrenando hasta julio 2026.
 
 El equipo confirmó que su evaluación de X-13 también realiza
 12 predicciones a un mes, reajustando el modelo en cada iteración
@@ -75,6 +99,13 @@ Se debe confirmar si este supuesto reproduce el retraso de publicación
 de la Secretaría de Energía y el momento de predicción de la BCR.
 
 ## 6. Prevención del uso de información futura
+
+**Regla anti-leakage:** toda decisión que alimenta al modelo (selección de
+variables, estandarización, tratamiento de outliers, hiperparámetros,
+transformación log o nivel) se toma dentro de cada iteración con datos hasta
+t-1. Nada se ajusta una vez con toda la serie y se reutiliza.
+
+En la práctica:
 
 - Las transformaciones y el preprocesamiento se ajustan solo con
   los datos de entrenamiento de cada iteración.
@@ -87,6 +118,42 @@ de la Secretaría de Energía y el momento de predicción de la BCR.
 La evaluación utiliza la historia contenida en los CSV actuales.
 No reproduce necesariamente las versiones de los datos disponibles
 en cada fecha histórica.
+
+## 6 bis. Comparaciones con incertidumbre y subperíodos
+
+Además del promedio, cada modelo se compara contra el naive estacional con
+la diferencia de pérdida mes a mes, d_t = pérdida(modelo) - pérdida(naive
+estacional). Negativa significa que el modelo tiene menos error. Se
+reportan dos pérdidas: error absoluto porcentual (la del MAPE) y error
+absoluto (la del MAE).
+
+Para cada diferencia se informan:
+
+- **Intervalo de confianza del 95 % por bootstrap circular por bloques.**
+  Los errores están autocorrelacionados, así que no se remuestrea mes por
+  mes sino en bloques de largo n^(1/3) (4 meses en el backtest, 2 en el
+  holdout), con 5000 réplicas y semilla fija.
+- **Diebold-Mariano** con varianza HAC de Newey-West (rezagos n^(1/3)) y
+  la corrección de muestra chica de Harvey, Leybourne y Newbold (1997),
+  con p-valor sobre una t con n-1 grados de libertad.
+
+Si el intervalo incluye el cero, la diferencia no es concluyente. Aun con
+48 meses es posible que varios intervalos lo incluyan: "ningún modelo le
+gana claramente al naive estacional" es un resultado válido y así se
+comunica al equipo y a la BCR.
+
+**Error por subperíodo.** Las métricas también se reportan separadas por
+régimen, con los cortes de `CORTES_REGIMEN` en `scripts/evaluacion.py`:
+
+| Corte | Primer mes del régimen nuevo |
+|---|---|
+| Ley 27.640 (biocombustibles) | agosto 2021 |
+| Corte de nivel observado en el EDA | noviembre 2025 |
+
+Como el backtest empieza en septiembre 2021, todo el backtest queda en el
+régimen de la Ley 27.640. El corte de noviembre 2025 cae dentro del
+holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a agosto
+2026. Con 2 y 10 meses, esos subperíodos son descriptivos, no inferenciales.
 
 ## 7. Escala de evaluación
 
@@ -173,10 +240,26 @@ Otros modelos podrán conectarse mediante adaptadores.
 ## 11. Archivos y resultados
 
 - docs/protocolo_evaluacion.md: reglas de evaluación.
-- scripts/evaluacion.py: función reutilizable y modelos simples.
+- scripts/evaluacion.py: función reutilizable, modelos simples, ventanas,
+  subperíodos y comparación de modelos.
 - scripts/prueba_evaluacion.py: ejecución y comprobaciones.
+- scripts/prueba_protocolo_largo.py: pruebas de ventanas, subperíodos,
+  bootstrap y Diebold-Mariano.
+- scripts/protocolo_largo.py: corre baselines y X-13 BCR en las dos ventanas.
 - results/predicciones_baselines.csv: resultados mensuales.
 - results/metricas_baselines.csv: métricas por serie y modelo.
+- results/protocolo_predicciones.csv: predicciones por serie, modelo,
+  ventana y mes.
+- results/protocolo_metricas.csv: métricas por serie, modelo y ventana.
+- results/protocolo_subperiodos.csv: métricas por subperíodo.
+- results/protocolo_diferencias.csv: diferencias contra el naive
+  estacional con intervalo y Diebold-Mariano.
+
+Las corridas de X-13 se cachean en `data/cache_x13.db` (no se versiona).
+La clave incluye un hash de los datos de entrenamiento y de los `.spc`: si
+cambia un dato o una configuración, esa corrida se rehace sola. La primera
+corrida completa tarda alrededor de una hora y media con 2 núcleos; las
+siguientes, segundos.
 
 Se utiliza results/ como carpeta común de resultados del equipo.
 

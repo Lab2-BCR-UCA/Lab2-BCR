@@ -10,3 +10,6 @@ variables_externas/data/*
 # Base unificada (se genera con scripts/build_db.py)
 data/bcr.db
 data/bcr.tmp
+
+# Caché de corridas de X-13 (se genera con scripts/protocolo_largo.py)
+data/cache_x13.db
