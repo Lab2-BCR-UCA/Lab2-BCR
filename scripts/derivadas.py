@@ -56,3 +56,36 @@ def margen_bioetanol_maiz(insumos: pd.DataFrame) -> pd.Series:
     """
     costo_maiz_por_litro = insumos["precio_maiz_pizarra_ars_tn"] / RINDE_L_POR_TN
     return insumos["precio_bioetanol_maiz_ars_l"] / costo_maiz_por_litro
+
+
+# ------------------------------------------------------------------ biodiésel
+
+# Toneladas de aceite de soja por tonelada de biodiésel. Supuesto: ~1 a 1 (la
+# transesterificación conserva la masa a grandes rasgos). Solo fija la escala
+# del ratio, no su poder predictivo.
+TN_ACEITE_POR_TN_BIODIESEL = 1.0
+
+
+def margen_domestico_biodiesel(insumos: pd.DataFrame) -> pd.Series:
+    """Margen doméstico del biodiésel (SCRUM-51), adimensional.
+
+        precio regulado [ARS/tn] / (aceite [USD/tn] · TC [ARS/USD] · tn_aceite/tn_bd)
+
+    El aceite de soja es el principal costo de producción del biodiésel. Como
+    el precio del aceite viene en dólares (World Bank), se pasa a pesos con el
+    tipo de cambio del mismo mes; recién ahí es comparable con el precio
+    regulado en pesos. Un valor menor a 1 indica que el precio regulado no
+    cubre el costo del aceite: es el mecanismo detrás del desabastecimiento del
+    corte de 2020, cuando las plantas dejaron de entregar. No incluye metanol,
+    energía ni logística, así que un valor apenas por encima de 1 puede ser
+    margen negativo en la práctica.
+
+    El aceite es promedio mensual y se publica a principios de t+1, así que esta
+    derivada hereda rezago 1 (ver data/disponibilidad_variables.csv).
+    """
+    costo_aceite_ars_tn = (
+        insumos["aceite_soja_usd_tn"]
+        * insumos["tipo_cambio_promedio"]
+        * TN_ACEITE_POR_TN_BIODIESEL
+    )
+    return insumos["precio_biodiesel_ars_tn"] / costo_aceite_ars_tn

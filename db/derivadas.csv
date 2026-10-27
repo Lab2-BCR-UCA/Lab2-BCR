@@ -1,2 +1,4 @@
 serie_id,funcion,insumos,unidad,tipo,variable_disponibilidad,huecos_esperados,descripcion
 margen_bioetanol_maiz,margen_bioetanol_maiz,precio_bioetanol_maiz_ars_l|precio_maiz_pizarra_ars_tn,ratio,externa,margen_bioetanol_maiz,no,Margen doméstico del bioetanol de maíz (precio regulado / costo del maíz por litro)
+margen_domestico_biodiesel,margen_domestico_biodiesel,precio_biodiesel_ars_tn|aceite_soja_usd_tn|tipo_cambio_promedio,ratio,externa,margen_domestico_biodiesel,no,"Margen doméstico del biodiésel (precio regulado / costo del aceite de soja en pesos)"
+
