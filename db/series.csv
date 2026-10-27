@@ -25,3 +25,4 @@ ventas_nafta_grado3_m3,combustibles,nafta_grado3_m3,m3,externa,ventas_nafta,no,n
 ventas_gasoil_total_m3,combustibles,ventas_gasoil_grados1a3_m3,m3,externa,ventas_gasoil,no,ninguno,Ventas de gasoil grados 1 a 3
 ventas_nafta_total_m3,combustibles,ventas_nafta_grados1a3_m3,m3,externa,ventas_nafta,no,ninguno,Ventas de nafta grados 1 a 3
 molienda_soja_tn,molienda_soja,molienda_soja_tn,tn,externa,molienda_soja,no,ninguno,Molienda de soja
+aceite_soja_usd_tn,aceite_soja,aceite_soja_usd_tn,USD/tn,externa,aceite_soja,no,ninguno,"Precio internacional del aceite de soja (promedio mensual, World Bank)"
