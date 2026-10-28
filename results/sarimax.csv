@@ -1,5 +1,6 @@
-serie,modelo,ventana,inicio_test,fin_test,meses_previstos,meses_evaluados,cobertura_pct,evaluacion_completa,MAE,RMSE,MAPE_pct,meses_validos_MAPE,ceros_excluidos_MAPE,acierto_signo_pct
-biodiesel,sarimax,backtest,2021-09,2025-08,48,48,100.0,True,29221.489506133075,38899.763068329914,29.975595058572814,48,0,37.5
-bioetanol_total,sarimax,backtest,2021-09,2025-08,48,48,100.0,True,7527.812302096339,9650.12009170874,8.031386292088039,48,0,70.83333333333334
-bioetanol_maiz,sarimax,backtest,2021-09,2025-08,48,48,100.0,True,6215.983823991769,7890.032520057824,10.401928342119295,48,0,64.58333333333334
-bioetanol_cana,sarimax,backtest,2021-09,2025-08,48,48,100.0,True,7627.743758890784,9792.261103979208,26.80693566415295,48,0,56.25
+serie,modelo,ventana,inicio_test,fin_test,meses_previstos,meses_evaluados,cobertura_pct,evaluacion_completa,MAE,RMSE,MAPE_pct,meses_validos_MAPE,ceros_excluidos_MAPE,acierto_signo_pct,variante
+biodiesel,sarimax_directo,backtest,2021-09,2025-08,48,48,100.0,True,29221.489506133075,38899.763068329914,29.975595058572814,48,0,37.5,directo
+bioetanol_maiz,sarimax_directo,backtest,2021-09,2025-08,48,48,100.0,True,6215.983823991769,7890.032520057824,10.401928342119295,48,0,64.58333333333334,directo
+bioetanol_cana,sarimax_directo,backtest,2021-09,2025-08,48,48,100.0,True,7627.743758890784,9792.261103979208,26.80693566415295,48,0,56.25,directo
+bioetanol_total,sarimax_directo,backtest,2021-09,2025-08,48,48,100.0,True,7527.812302096339,9650.12009170874,8.031386292088039,48,0,70.83333333333334,directo
+bioetanol_total,sarimax_suma_maiz_cana,backtest,2021-09,2025-08,48,48,100.0,True,10703.336310334715,13341.778966030632,11.342526060652858,48,0,62.5,suma_maiz_cana
