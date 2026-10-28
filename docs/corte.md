@@ -90,13 +90,14 @@ estaban en la base.
 |---|---|---|
 | Biodiesel 5% (ene-jul 2010) | Res. SE 7/2010 | alta |
 | Biodiesel 7% (jul 2010 - mar 2013) | Res. SE 554/2010 (BO 12/7/2010), ratificada por Res. SE 56/2012 art. 4 | alta |
-| Biodiesel 8% (abr-dic 2013) | Nota de la Secretaría de Energía a las petroleras | media |
+| Biodiesel 8% (abr - 5/8/2013) | Nota de la Secretaría de Energía a las petroleras (abril 2013) | media |
+| Biodiesel 8% (6/8 - dic 2013) | Res. SE 450/2013 (6/8/2013, art. 3) | alta |
 | Biodiesel 9% (ene 2014) y 10% (feb 2014 - dic 2020) | Res. SE 1125/2013; Res. MEyM 37/2016 | media / alta |
 | Biodiesel 5% / 6,7% / 8,4% (ene-mar 2021) y 10% (abr-jun 2021) | Res. SE 1/2021 | alta |
 | Biodiesel 5% (jul 2021 - jun 2022) | Res. SE 624/2021 (BO 1/7/2021, art. 4) y desde el 4/8/2021 Ley 27.640 | alta |
 | Biodiesel 7,5% (desde 16/6/2022) | Res. SE 438/2022; confirmado por el IACA de septiembre 2026 de la BCR | alta |
 | COTAB +5% (16/6 - 16/10/2022) | DNU 330/2022; prórrogas Res. SE 636, 637 y 638/2022 | alta |
-| Bioetanol 5% (2010 - sep 2014) | Ley 26.093 | media |
+| Bioetanol 5% (2010 - sep 2014) | Ley 26.093; confirmado por los considerandos de la Res. SE 44/2014 | alta |
 | Bioetanol 8,5% → 10% (sep-dic 2014) | Res. SE 44/2014 | alta |
 | Bioetanol 12% (desde abr 2016) | Res. MEyM 37/2016, Decreto 543/2016; Ley 27.640 | alta |
 
@@ -105,11 +106,45 @@ el 30/6/2021 que no tenía norma que lo respalde (la Res. SE 624/2021 recién
 rige desde el 1/7/2021, así que junio 2021 es 10% completo). El tramo actual de
 biodiesel es 7,5% y no 7%.
 
-Los tramos de confianza media son todos anteriores a 2015, fuera del backtest
-(desde septiembre 2021); solo afectan al entrenamiento y no se investigaron más.
+### Tramos 2013-2014 (revisión de SCRUM-48)
+
+Bioetanol entrena desde 2013 y usa el nominal como régimen justo en ese
+período, así que estos tramos se verificaron con las normas.
+
+**Biodiesel 2013.** El 8% tiene norma: la **Res. SE 450/2013** (6/8/2013), que
+en su art. 3 sustituye el art. 4 de la Res. SE 56/2012 y fija el mínimo en 8%
+en volumen. Desde esa fecha el tramo es de confianza alta. Entre abril y el
+5/8/2013 el 8% surge de una nota de la Secretaría a las petroleras, sin
+resolución propia (el piso escrito seguía en 7%), y queda en confianza media.
+Se mantiene 8% desde abril porque es el valor que después formaliza la
+Res. 450/2013 y el corte efectivo sube a 8-9% en mayo-junio 2013. La
+alternativa conservadora (7% hasta el 5/8/2013) cambia solo cuatro meses,
+anteriores al backtest. La serie mensual no cambia con esta revisión.
+
+**Bioetanol 2010 - sep 2014.** El 5% es correcto y pasa a confianza alta: la
+Res. SE 44/2014 parte de ese 5% como mínimo vigente y es la primera norma que
+lo sube (8,5% desde su vigencia, 9%, 9,5% y 10% en dic-2014). No faltan
+escalones: la suba del efectivo de ~2,7% (2012) a ~8% (2014) vino por **cupos
+de volumen** asignados a cada empresa (Res. SE 698/2009, 553/2010, 1673/2010,
+424/2011, 5/2012, 137/2012 y 1675/2012), sin cambiar el porcentaje mínimo.
+Por eso el efectivo está por debajo del 5% hasta comienzos de 2013 (no había
+oferta suficiente) y por encima desde mediados de 2013.
+
+**Implicancia para el modelo.** En bioetanol 2012 - ago 2014 el nominal no es
+la restricción que opera: la regla real eran los cupos. Ese tramo no es un
+cambio de régimen por norma; para capturarlo sirve el efectivo o la brecha
+efectivo − nominal, no el nominal solo. A tener en cuenta en SCRUM-31.
+
+Pendientes menores (no cambian valores mensuales salvo por días):
+
+- Fecha de Boletín Oficial de la Res. SE 450/2013 y de la Res. SE 44/2014
+  (hoy se usa la fecha de dictado).
+- Biodiesel 9% (ene-2014): confirmar la vigencia exacta de la Res. SE 1125/2013.
 
 Fuentes de la verificación:
 [Res. SE 624/2021](https://www.argentina.gob.ar/normativa/nacional/norma-351541/texto),
+[Res. SE 450/2013 (InfoLEG)](https://webfs.oecd.org/TADWEB/agriculture/data/AMIS/Indicators/Sources/www.infoleg.gob.ar_infolegInternet_anexos_215000-219999_218395_norma.pdf),
+[Res. SE 44/2014 (InfoLEG)](https://webfs.oecd.org/TADWEB/agriculture/data/AMIS/Indicators/Sources/Resolucion_44-2014.pdf),
 [Res. SE 56/2012 (Boletín Oficial)](https://www.boletinoficial.gob.ar/pdf/aviso/primera/66837/20120316),
 [Marval: Res. SE 554/2010](https://www.marval.com/publicacion/biocombustibles-5691),
 [Bichos de Campo: Res. SE 1/2021](https://bichosdecampo.com/mientras-los-precios-subiran-hasta-90-en-mayo-baja-a-la-mitad-el-corte-obligatorio-del-gasoil-con-biodiesel).
