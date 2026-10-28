@@ -26,6 +26,7 @@ ventas_gasoil_total_m3,combustibles,ventas_gasoil_grados1a3_m3,m3,externa,ventas
 ventas_nafta_total_m3,combustibles,ventas_nafta_grados1a3_m3,m3,externa,ventas_nafta,no,ninguno,Ventas de nafta grados 1 a 3
 molienda_soja_tn,molienda_soja,molienda_soja_tn,tn,externa,molienda_soja,no,ninguno,Molienda de soja
 aceite_soja_usd_tn,aceite_soja,aceite_soja_usd_tn,USD/tn,externa,aceite_soja,no,ninguno,"Precio internacional del aceite de soja (promedio mensual, World Bank)"
+azucar_usd_kg,azucar,azucar_usd_kg,USD/kg,externa,azucar,no,ninguno,"Precio internacional del azúcar (Sugar, world; promedio mensual, World Bank). Aproximación: los ingenios venden sobre todo en el mercado interno"
 corte_biodiesel_nominal_pct,corte_nominal,corte_biodiesel_nominal_pct,%,externa,corte_nominal,no,ninguno,"Corte mínimo obligatorio de biodiesel en gasoil según la norma vigente (promedio por días)"
 corte_biodiesel_cotab_pct,corte_nominal,corte_biodiesel_cotab_pct,%,externa,corte_nominal,no,ninguno,"Corte adicional transitorio de biodiesel de 2022 (COTAB, DNU 330/2022); 0 fuera de ese período"
 corte_bioetanol_nominal_pct,corte_nominal,corte_bioetanol_nominal_pct,%,externa,corte_nominal,no,ninguno,"Corte mínimo obligatorio de bioetanol en nafta según la norma vigente (promedio por días)"

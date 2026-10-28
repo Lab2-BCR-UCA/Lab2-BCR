@@ -47,6 +47,7 @@ significa usar `x[t-k]` para estimar `y[t]`.
 | Corte nominal | Boletín Oficial / Sec. Energía | Mensual (por norma) | Vigente desde la norma | Sí | **0** | Confirmado |
 | Corte efectivo | Sec. Energía (ventas al corte) | Mensual | Principios de `t+2` | No | **1** | Confirmado |
 | Aceite de soja | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-49) |
+| Azúcar (precio internacional) | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Mismo archivo que el aceite (SCRUM-58) |
 | IPC | INDEC | Mensual | ~día 13 de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-50) |
 | Margen doméstico biodiesel | Derivada (precio / aceite × TC) | Mensual | Dentro de `t+1` | Sí | **0** | A confirmar (SCRUM-51) |
 | Margen bioetanol de maíz | Derivada (precio / pizarra maíz) | Mensual | Cierre de `t` | Sí | **0** | Confirmado (SCRUM-52) |
@@ -70,6 +71,10 @@ significa usar `x[t-k]` para estimar `y[t]`.
   `t-1`.
 - **Aceite de soja (Banco Mundial):** el Pink Sheet publica a principios del
   mes siguiente; cubre la ventana de estimación.
+- **Azúcar (Banco Mundial):** sale del mismo Excel que el aceite de soja
+  (columna "Sugar, world", USD/kg), así que tiene el mismo calendario y
+  rezago 0. Es el precio internacional: los ingenios venden sobre todo en el
+  mercado interno, así que es una aproximación (SCRUM-58).
 - **IPC:** INDEC publica el IPC de `t` alrededor del día 13 de `t+1`.
 
 ## Impacto en el modelo

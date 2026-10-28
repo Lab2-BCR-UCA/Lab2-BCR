@@ -8,6 +8,7 @@ variables_externas/data/*
 !variables_externas/data/soja_mensual.csv
 !variables_externas/data/combustibles_mensual.csv
 !variables_externas/data/aceite_soja_mensual.csv
+!variables_externas/data/azucar_mensual.csv
 !variables_externas/data/indec_biodiesel/
 # Base unificada (se genera con scripts/build_db.py)
 data/bcr.db

@@ -71,7 +71,7 @@ EXOGENAS: dict[str, list[tuple[str, int]]] = {
     ],
     "bioetanol_cana": [
         ("ventas_nafta_total_m3", 0),
-        # TODO N2 (Banco Mundial): ("precio_azucar_usd_tn", 0)
+        # TODO SCRUM-62 (ya en la base, SCRUM-58): ("azucar_usd_kg", 0)
     ],
 }
 
