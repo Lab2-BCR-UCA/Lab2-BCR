@@ -89,3 +89,50 @@ def margen_domestico_biodiesel(insumos: pd.DataFrame) -> pd.Series:
         * TN_ACEITE_POR_TN_BIODIESEL
     )
     return insumos["precio_biodiesel_ars_tn"] / costo_aceite_ars_tn
+
+
+# ------------------------------------------------------- corte efectivo (SCRUM-48)
+#
+# El corte efectivo es qué porcentaje del combustible vendido fue realmente
+# biocombustible. Se calcula con las ventas al corte (archivo de producción)
+# sobre las ventas de combustible en surtidor (SESCO). Puede quedar por debajo
+# del corte nominal (la norma) cuando las plantas no entregan todo lo pedido.
+# Se expresa en %, igual que el corte nominal, para poder compararlos.
+#
+# Supuesto: las ventas de gasoil y nafta de SESCO ya incluyen el
+# biocombustible mezclado (se vende la mezcla). Con eso, en agosto 2026 el
+# corte efectivo de biodiesel da ~7,2% contra un nominal de 7,5%, lo que es
+# coherente. Ver docs/corte.md.
+
+# Densidad del biodiesel para pasar toneladas a m3 (~0,88 tn/m3, rango típico
+# 0,86-0,90). Supuesto: un error de densidad cambia la escala, no la forma.
+DENSIDAD_BIODIESEL_TN_M3 = 0.88
+
+
+def corte_efectivo_biodiesel(insumos: pd.DataFrame) -> pd.Series:
+    """% de biodiesel en el gasoil vendido.
+
+        ventas al corte [tn] / DENSIDAD_BIODIESEL_TN_M3 / ventas de gasoil [m3] × 100
+    """
+    biodiesel_m3 = insumos["biodiesel_ventas_corte_tn"] / DENSIDAD_BIODIESEL_TN_M3
+    return biodiesel_m3 / insumos["ventas_gasoil_total_m3"] * 100
+
+
+def corte_efectivo_bioetanol(insumos: pd.DataFrame) -> pd.Series:
+    """% de bioetanol (caña + maíz) en la nafta vendida. Comparable con el 12% nominal."""
+    return insumos["bioetanol_ventas_total_m3"] / insumos["ventas_nafta_total_m3"] * 100
+
+
+def corte_efectivo_bioetanol_maiz(insumos: pd.DataFrame) -> pd.Series:
+    """% de bioetanol de maíz en la nafta vendida.
+
+    La norma (Ley 27.640) pide al menos 6% de caña y 6% de maíz; cuando la caña
+    no llega, el maíz completa. Por eso la parte de cada materia prima se mide
+    con este dato y no con la norma.
+    """
+    return insumos["bioetanol_ventas_maiz_m3"] / insumos["ventas_nafta_total_m3"] * 100
+
+
+def corte_efectivo_bioetanol_cana(insumos: pd.DataFrame) -> pd.Series:
+    """% de bioetanol de caña en la nafta vendida (ver corte_efectivo_bioetanol_maiz)."""
+    return insumos["bioetanol_ventas_cana_m3"] / insumos["ventas_nafta_total_m3"] * 100
