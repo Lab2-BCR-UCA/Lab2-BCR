@@ -64,6 +64,7 @@ CANDIDATAS = [
     "molienda_soja_tn",
     "margen_bioetanol_maiz",
     "margen_domestico_biodiesel",  # SCRUM-51, candidata estrella del biodiésel
+    "azucar_usd_kg",  # SCRUM-58, reparto de la caña entre azúcar y alcohol
 ]
 
 

@@ -39,6 +39,7 @@ qué rezago probar, no para descartar.
 | **precio_biodiesel** (regulado) | Precio de venta → rentabilidad | biodiésel | 0 | 0, 1 | +0,30 @ rz0 · n=27 | Débil (n chico) |
 | **precio_bioetanol** (regulado) | Ídem para el etanol | bioetanol | 0 | 0, 1 | sin CCF (n<24 pre-2021) | Por mecanismo |
 | **corte_efectivo** | Cumplimiento real de la mezcla (varió 3%→7% con norma fija) | ambos (bioetanol: total, maíz y caña) | 1 | 1 | en la base desde SCRUM-48; la prueba va en SCRUM-31 | Por mecanismo. Ojo: muy correlacionado con la producción del mes anterior (ver `docs/corte.md`) |
+| **azucar_usd_kg** | Los ingenios reparten la caña entre azúcar y alcohol según cuál paga más: azúcar cara → menos bioetanol de caña. La zafra (may-nov) ya la captura la estacionalidad; el precio explica cuánto alcohol sale | bioetanol caña y total | 0 | 0, 1, 2 | -0,27 caña / -0,21 total @ rz2 · n=103, pero también -0,18 con **maíz** @ rz2, donde no hay mecanismo (posible factor común); en rz0-1 el signo da al revés (+0,11 a +0,18). **La CCF no la respalda** | Por mecanismo; la decide la ablación. Limitaciones: viene con dos decimales (variación mensual escalonada) y es el precio internacional (Banco Mundial, "Sugar, world"); los ingenios venden sobre todo en el mercado interno, así que es una aproximación (SCRUM-58) |
 
 ## Variables de régimen (no candidatas principales)
 
