@@ -1,0 +1,3 @@
+serie,MAE_d1,MAPE_d1,MAE_d0,MAPE_d0,dif_MAE_d0_menos_d1,ic95_inf,ic95_sup,dm_p_valor,distinguible_95
+biodiesel,29221.49,29.98,31554.73,33.91,2333.24,294.3,4208.05,0.0254,True
+bioetanol_cana,7627.74,26.81,7039.49,26.16,-588.25,-1631.01,474.57,0.286,False
