@@ -13,9 +13,12 @@ Cómo bajar los archivos (https://comex.indec.gob.ar):
     Tipo de comercio = Exportación, Año = <año>, Período = Mensual,
     Consulta por país = Total exportado,
     Productos = 38260000 (Biodiésel y sus mezclas...).
-Guardar cada año como
-``variables_externas/data/indec_biodiesel/indec_38260000_<año>.csv``.
-Cada mes alcanza con volver a bajar el año en curso y reemplazar su archivo.
+Guardar el CSV en ``variables_externas/data/indec_biodiesel/`` con el nombre
+que le pone INDEC (``Resultado de la búsqueda_<año>_<número>.csv``) o como
+``indec_38260000_<año>_<número>.csv``, pero **sin perder el número**: es la
+fecha y hora de la descarga (milisegundos desde 1970) y el script la usa para
+controlar que el archivo no esté desactualizado. Cada mes alcanza con volver a
+bajar el año en curso y reemplazar su archivo (borrar el anterior de ese año).
 
 Formato de INDEC: separador ``;``, miles con ``.`` y decimales con ``,``.
 Un mes con exportación tiene su fila; un mes sin exportación no aparece; un mes
@@ -33,20 +36,21 @@ Salidas (dos archivos porque la base no admite valores nulos):
 La imputación de los meses ocultos no se hace acá: va en el constructor de
 features (SCRUM-59), con datos hasta t-1.
 
-Último mes publicado: un mes sin fila puede ser "sin exportación" o "todavía no
-publicado". Por defecto se toma como publicado hasta el mes anterior al que
-corresponde a hoy menos 20 días (INDEC publica alrededor del día 20). Se puede
-fijar con ``--hasta``.
+Último mes publicado (``--hasta``, obligatorio): un mes sin fila puede ser
+"sin exportación" o "todavía no publicado", y el archivo no permite
+distinguirlos. Por eso hay que decir a mano hasta qué mes publicó INDEC, y el
+script frena si el archivo de ese año se bajó antes del día 20 del mes
+siguiente (antes de que INDEC lo publicara). Sin este control, correr el script
+con un archivo viejo cargaría el último mes como exportación 0 sin ningún aviso.
 
 Uso, desde la raíz del repo:
-    python variables_externas/procesar_indec_biodiesel.py
     python variables_externas/procesar_indec_biodiesel.py --hasta 2026-09
 """
 from __future__ import annotations
 
 import argparse
 import re
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -57,6 +61,7 @@ SALIDA_MESES = RAIZ / "data" / "exportaciones_biodiesel_indec.csv"
 SALIDA_TN = RAIZ / "data" / "exportaciones_biodiesel_indec_tn.csv"
 NCM = "38260000"
 DIAS_PUBLICACION = 20  # INDEC publica el mes t alrededor del día 20 de t+1
+HORA_ARGENTINA = timezone(timedelta(hours=-3))
 
 MESES = {"Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4, "Mayo": 5, "Junio": 6,
          "Julio": 7, "Agosto": 8, "Septiembre": 9, "Octubre": 10,
@@ -78,6 +83,17 @@ def anio_de(ruta: Path) -> int:
     if len(encontrados) != 1:
         raise ValueError(f"{ruta.name}: el nombre tiene que incluir el año (4 dígitos)")
     return int(encontrados[0])
+
+
+def descargado_el(ruta: Path) -> datetime:
+    """Fecha y hora de descarga (hora argentina), del número de 13 dígitos que
+    INDEC pone en el nombre del archivo (milisegundos desde 1970)."""
+    encontrados = re.findall(r"(?<!\d)(\d{13})(?!\d)", ruta.stem)
+    if len(encontrados) != 1:
+        raise ValueError(f"{ruta.name}: falta el número de descarga de INDEC en el nombre "
+                         "(13 dígitos, por ejemplo indec_38260000_2026_1793115919761.csv). "
+                         "Guardar el archivo con el nombre que le pone INDEC.")
+    return datetime.fromtimestamp(int(encontrados[0]) / 1000, HORA_ARGENTINA)
 
 
 def leer_anio(ruta: Path) -> pd.DataFrame:
@@ -113,10 +129,19 @@ def leer_anio(ruta: Path) -> pd.DataFrame:
     return out
 
 
-def ultimo_mes_publicado(hoy: date | None = None) -> pd.Timestamp:
-    """Mes anterior al de (hoy - 20 días): el último que INDEC ya publicó."""
-    ref = (hoy or date.today()) - timedelta(days=DIAS_PUBLICACION)
-    return pd.Timestamp(year=ref.year, month=ref.month, day=1) - pd.DateOffset(months=1)
+def controlar_actualizado(archivos: list[Path], hasta: pd.Timestamp) -> None:
+    """Frena si el archivo del año de ``hasta`` se bajó antes de que INDEC
+    publicara ese mes (día DIAS_PUBLICACION del mes siguiente)."""
+    del_anio = [a for a in archivos if anio_de(a) == hasta.year]
+    publicado = (hasta + pd.DateOffset(months=1)).replace(day=DIAS_PUBLICACION).date()
+    for a in del_anio:
+        bajado = descargado_el(a).date()
+        if bajado < publicado:
+            raise ValueError(
+                f"{a.name} se bajó el {bajado:%d/%m/%Y}, antes de que INDEC publicara "
+                f"{hasta:%m/%Y} (alrededor del {publicado:%d/%m/%Y}). Volver a bajar el "
+                f"año {hasta.year} o usar un --hasta anterior; si no, los meses que "
+                "todavía no estaban publicados entrarían como exportación 0.")
 
 
 def armar(hasta: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -126,7 +151,12 @@ def armar(hasta: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame]:
         raise FileNotFoundError(f"No hay CSV de INDEC en {CARPETA}")
     datos = pd.concat([leer_anio(a) for a in archivos]).set_index("fecha").sort_index()
 
-    anios = sorted({anio_de(a) for a in archivos})
+    por_anio = pd.Series([anio_de(a) for a in archivos])
+    repetidos = sorted(set(por_anio[por_anio.duplicated()]))
+    if repetidos:
+        raise ValueError(f"Hay más de un archivo para los años {repetidos}; dejar solo el más nuevo")
+    controlar_actualizado(archivos, hasta)
+    anios = sorted(por_anio)
     meses = pd.date_range(f"{anios[0]}-01-01", hasta, freq="MS")
     posteriores = datos.index[datos.index > hasta]
     if len(posteriores):
@@ -155,9 +185,10 @@ def armar(hasta: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--hasta", help="último mes publicado por INDEC (YYYY-MM)")
+    parser.add_argument("--hasta", required=True,
+                        help="último mes publicado por INDEC (YYYY-MM), por ejemplo 2026-09")
     args = parser.parse_args()
-    hasta = pd.Timestamp(f"{args.hasta}-01") if args.hasta else ultimo_mes_publicado()
+    hasta = pd.Timestamp(f"{args.hasta}-01")
 
     serie_meses, serie_tn = armar(hasta)
     serie_meses.to_csv(SALIDA_MESES, index=False)

@@ -67,7 +67,7 @@ python scripts/scrape_produccion_se.py     # producción (target)
 python scripts/scrape_cac_soja_maiz.py     # soja y maíz
 python scripts/scrape_tipo_cambio.py       # tipo de cambio
 python scripts/scrape_biocombustibles.py   # precios regulados
-python variables_externas/procesar_indec_biodiesel.py   # exportaciones de biodiesel (INDEC)
+python variables_externas/procesar_indec_biodiesel.py --hasta 2026-09   # exportaciones de biodiesel (INDEC); --hasta = último mes publicado
 ```
 
 Las exportaciones de INDEC no se descargan solas: cada mes hay que bajar a

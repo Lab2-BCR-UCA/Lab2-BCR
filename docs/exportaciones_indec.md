@@ -26,13 +26,16 @@ de que la BCR haga la estimación (días 22 a 28). Por eso entra con **rezago 0*
      (desagregado)": el procesador lo rechaza)
    - Productos: **38260000** (Biodiésel y sus mezclas, sin aceites de petróleo
      o con un contenido ≤ 70%)
-3. Descargar el CSV y guardarlo como
-   `variables_externas/data/indec_biodiesel/indec_38260000_<año>.csv`,
-   reemplazando el del año en curso.
-4. Correr, desde la raíz del repo:
+3. Descargar el CSV y ponerlo en `variables_externas/data/indec_biodiesel/`
+   **con el nombre que le pone INDEC** (`Resultado de la búsqueda_<año>_<número>.csv`),
+   y borrar el archivo anterior de ese año. El número del nombre es la fecha y
+   hora de la descarga, y el procesador lo usa para el control del paso 4: si
+   se renombra el archivo, hay que conservar el número.
+4. Correr, desde la raíz del repo, indicando el último mes que ya publicó
+   INDEC (por ejemplo, después del 20/11 se puede usar octubre):
 
    ```bash
-   python variables_externas/procesar_indec_biodiesel.py
+   python variables_externas/procesar_indec_biodiesel.py --hasta 2026-10
    python scripts/build_db.py
    ```
 
@@ -64,11 +67,22 @@ hace falta porque se predicen toneladas. `expo_indec_tn` tiene
 `huecos_esperados = si`: los meses ocultos aparecen como aviso de meses
 faltantes, no como error.
 
-**Último mes publicado.** Un mes sin fila puede ser "sin exportación" o
-"todavía no publicado". Por defecto el procesador toma como publicado hasta el
-mes anterior al de (hoy − 20 días): el 27/10 toma hasta septiembre; el 15/11,
-también septiembre; el 21/11, octubre. Se puede fijar a mano con
-`--hasta YYYY-MM`.
+**Último mes publicado (`--hasta`, obligatorio).** Un mes sin fila puede ser
+"sin exportación" o "todavía no publicado", y el archivo no permite
+distinguirlos. Si se corriera el procesador con un archivo viejo, el último mes
+entraría como exportación 0 sin ningún aviso, y es la variable principal del
+biodiesel. Por eso:
+
+- `--hasta` es obligatorio: hay que decir hasta qué mes publicó INDEC.
+- El procesador frena si el archivo del año de `--hasta` se bajó antes del día
+  20 del mes siguiente (antes de que INDEC lo publicara). La fecha de descarga
+  sale del número que INDEC pone en el nombre del archivo.
+- También frena si hay dos archivos del mismo año o si falta el número en el
+  nombre.
+
+El día 20 es aproximado: si INDEC publica más tarde (por ejemplo el 22) y el
+archivo se bajó el 21, el control no lo detecta. Ante la duda, bajar el
+archivo después de ver publicado el informe de intercambio comercial del mes.
 
 ## Validación contra la Secretaría de Energía
 
