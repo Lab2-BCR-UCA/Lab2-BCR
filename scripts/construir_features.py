@@ -55,7 +55,9 @@ EXOGENAS: dict[str, list[tuple[str, int]]] = {
     # Biodiésel: SIN exógenas internas (desestabilizan el SARIMAX, ver cabecera).
     # Su driver real son las exportaciones; entran cuando esté N1.
     "biodiesel": [
-        # TODO N1 (INDEC): ("exportaciones_biodiesel_indec", 0) + indicador de oculto
+        # Ya en la base (SCRUM-57): ("expo_indec_tn", 0) + ("expo_indec_oculto", 0).
+        #   Falta imputar acá los meses ocultos de expo_indec_tn (vienen vacíos)
+        #   con datos hasta t-1 antes de sumarla; ver docs/exportaciones_indec.md.
         # SCRUM-31 (ya en la base, SCRUM-48): ("corte_efectivo_biodiesel", 1),
         #   ("corte_biodiesel_nominal_pct", 0) como régimen
     ],

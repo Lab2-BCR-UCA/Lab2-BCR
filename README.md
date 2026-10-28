@@ -42,6 +42,7 @@ Todo es dato **público y oficial**.
 | `tipo_cambio_mensual.csv` | Tipo de cambio oficial USD/ARS | API del BCRA | 2018→ |
 | `biodiesel_precios.csv` | Precio regulado del biodiesel | Secretaría de Energía | 2018→ |
 | `bioetanol_precios.csv` | Precio regulado del bioetanol (caña y maíz) | Secretaría de Energía | 2018→ |
+| `exportaciones_biodiesel_indec.csv` y `exportaciones_biodiesel_indec_tn.csv` | Exportaciones de biodiesel (NCM 38260000): si hubo, si el monto está oculto, toneladas y FOB. Llegan ~20 días después del mes, antes que la Secretaría | INDEC (comercio exterior) | 2012→ |
 
 Los precios, el tipo de cambio y los granos son **variables externas
 candidatas**; se decide cuáles entran al modelo en el análisis de variables
@@ -66,7 +67,13 @@ python scripts/scrape_produccion_se.py     # producción (target)
 python scripts/scrape_cac_soja_maiz.py     # soja y maíz
 python scripts/scrape_tipo_cambio.py       # tipo de cambio
 python scripts/scrape_biocombustibles.py   # precios regulados
+python variables_externas/procesar_indec_biodiesel.py --hasta 2026-09   # exportaciones de biodiesel (INDEC); --hasta = último mes publicado
 ```
+
+Las exportaciones de INDEC no se descargan solas: cada mes hay que bajar a
+mano el CSV del año en curso del sistema de consulta de INDEC y reemplazarlo en
+`variables_externas/data/indec_biodiesel/` antes de correr el procesador. El
+paso a paso está en `docs/exportaciones_indec.md`.
 
 `scrape_produccion_se.py` también acepta la ruta a un `.xlsx` local como
 argumento, por si la descarga automática falla, y guarda una copia fechada de

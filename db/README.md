@@ -84,11 +84,19 @@ Vistas:
 | `v_ultima_version` | Para cada serie y mes, el valor de la descarga más reciente. Formato largo. |
 | `v_dataset_mensual` | Lo mismo, una fila por mes y una columna por serie. Se genera desde el catálogo, así una serie nueva aparece sola. |
 
-Hoy son 10 fuentes y 36 series: 30 crudas (4 objetivo, que son biodiesel y
+Hoy son 12 fuentes y 38 series: 32 crudas (4 objetivo, que son biodiesel y
 bioetanol total, de maíz y de caña; 6 auxiliares, que son ventas y
-exportaciones del mismo archivo de producción; y 20 externas) y 6 derivadas:
-los márgenes del bioetanol de maíz (SCRUM-52) y del biodiesel (SCRUM-51) y los
+exportaciones del mismo archivo de producción; y 22 externas, entre ellas las
+2 de exportaciones de biodiesel de INDEC, SCRUM-57) y 6 derivadas: los
+márgenes del bioetanol de maíz (SCRUM-52) y del biodiesel (SCRUM-51) y los
 cuatro cortes efectivos (SCRUM-48, ver `docs/corte.md`).
+
+Las exportaciones de INDEC vienen en dos fuentes porque la base no admite
+nulos: `exportaciones_indec` tiene todos los meses (`expo_indec_oculto`: si el
+monto está oculto por secreto estadístico) y `exportaciones_indec_tn` solo los
+meses con monto visible (`expo_indec_tn`). Por eso `expo_indec_tn` genera un
+aviso de meses faltantes: son los meses ocultos (ver
+`docs/exportaciones_indec.md`).
 
 ### Consultas útiles
 
