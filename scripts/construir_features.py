@@ -56,7 +56,8 @@ EXOGENAS: dict[str, list[tuple[str, int]]] = {
     # Su driver real son las exportaciones; entran cuando esté N1.
     "biodiesel": [
         # TODO N1 (INDEC): ("exportaciones_biodiesel_indec", 0) + indicador de oculto
-        # TODO SCRUM-48:   ("corte_efectivo_biodiesel", 1)
+        # SCRUM-31 (ya en la base, SCRUM-48): ("corte_efectivo_biodiesel", 1),
+        #   ("corte_biodiesel_nominal_pct", 0) como régimen
     ],
     "bioetanol_total": [
         ("ventas_nafta_total_m3", 0),
@@ -64,7 +65,7 @@ EXOGENAS: dict[str, list[tuple[str, int]]] = {
     "bioetanol_maiz": [
         ("ventas_nafta_total_m3", 0),
         ("margen_bioetanol_maiz", 0),
-        # TODO SCRUM-48: ("corte_efectivo_etanol", 1)
+        # SCRUM-31 (ya en la base, SCRUM-48): ("corte_efectivo_bioetanol_maiz", 1)
     ],
     "bioetanol_cana": [
         ("ventas_nafta_total_m3", 0),

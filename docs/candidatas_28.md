@@ -38,13 +38,13 @@ qué rezago probar, no para descartar.
 | **margen_domestico_biodiesel** | Si el precio no cubre el aceite, las plantas no entregan al corte (2020) | biodiésel | 0 | 0, 1 | -0,18 @ rz2 · n=41 (señal débil) | Por mecanismo (evidencia = colapso de nivel 2020) |
 | **precio_biodiesel** (regulado) | Precio de venta → rentabilidad | biodiésel | 0 | 0, 1 | +0,30 @ rz0 · n=27 | Débil (n chico) |
 | **precio_bioetanol** (regulado) | Ídem para el etanol | bioetanol | 0 | 0, 1 | sin CCF (n<24 pre-2021) | Por mecanismo |
-| **corte_efectivo** | Cumplimiento real de la mezcla (varió 3%→7% con norma fija) | ambos | 1 | 1 | pendiente (SCRUM-48) | Por mecanismo (datos pendientes) |
+| **corte_efectivo** | Cumplimiento real de la mezcla (varió 3%→7% con norma fija) | ambos (bioetanol: total, maíz y caña) | 1 | 1 | en la base desde SCRUM-48; la prueba va en SCRUM-31 | Por mecanismo. Ojo: muy correlacionado con la producción del mes anterior (ver `docs/corte.md`) |
 
 ## Variables de régimen (no candidatas principales)
 
 | Variable | Rol |
 |---|---|
-| **corte_nominal** | Explica **saltos de nivel** por cambio de norma. En el backtest (desde sep-2021) cambia una sola vez en biodiésel y ninguna en bioetanol → sirve en el entrenamiento como régimen, no como predictor del mes a mes. |
+| **corte_nominal** | Explica **saltos de nivel** por cambio de norma. En el backtest (desde sep-2021) cambia una sola vez en biodiésel (5% → 7,5% el 16/6/2022, más el COTAB de jun-oct 2022) y ninguna en bioetanol (12% desde 2016) → sirve en el entrenamiento como régimen, no como predictor del mes a mes. En la base desde SCRUM-48. |
 
 ## Candidatas débiles / que entran por otra vía
 
@@ -67,6 +67,6 @@ qué rezago probar, no para descartar.
 
 ## Pendiente de datos
 
-Falta el **corte** (SCRUM-48): cuando entre a la base se recalcula la CCF y se
-completa su fila. Para biodiésel, el driver real (exportaciones de INDEC) y el
+El **corte** ya está en la base (SCRUM-48, ver `docs/corte.md`); su prueba en el
+modelo va en SCRUM-31. Para biodiésel, el driver real (exportaciones de INDEC) y el
 azúcar para la caña se suman cuando estén sus tickets de datos.

@@ -2,3 +2,7 @@ serie_id,funcion,insumos,unidad,tipo,variable_disponibilidad,huecos_esperados,de
 margen_bioetanol_maiz,margen_bioetanol_maiz,precio_bioetanol_maiz_ars_l|precio_maiz_pizarra_ars_tn,ratio,externa,margen_bioetanol_maiz,no,Margen doméstico del bioetanol de maíz (precio regulado / costo del maíz por litro)
 margen_domestico_biodiesel,margen_domestico_biodiesel,precio_biodiesel_ars_tn|aceite_soja_usd_tn|tipo_cambio_promedio,ratio,externa,margen_domestico_biodiesel,no,"Margen doméstico del biodiésel (precio regulado / costo del aceite de soja en pesos)"
 
+corte_efectivo_biodiesel,corte_efectivo_biodiesel,biodiesel_ventas_corte_tn|ventas_gasoil_total_m3,%,externa,corte_efectivo,no,"Corte efectivo de biodiesel: % de biodiesel en el gasoil vendido (ventas al corte / ventas de gasoil)"
+corte_efectivo_bioetanol,corte_efectivo_bioetanol,bioetanol_ventas_total_m3|ventas_nafta_total_m3,%,externa,corte_efectivo,no,"Corte efectivo de bioetanol: % de bioetanol (caña + maíz) en la nafta vendida"
+corte_efectivo_bioetanol_maiz,corte_efectivo_bioetanol_maiz,bioetanol_ventas_maiz_m3|ventas_nafta_total_m3,%,externa,corte_efectivo,no,"Corte efectivo de bioetanol de maíz: % de bioetanol de maíz en la nafta vendida"
+corte_efectivo_bioetanol_cana,corte_efectivo_bioetanol_cana,bioetanol_ventas_cana_m3|ventas_nafta_total_m3,%,externa,corte_efectivo,no,"Corte efectivo de bioetanol de caña: % de bioetanol de caña en la nafta vendida"
