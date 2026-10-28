@@ -116,9 +116,11 @@ sumar variables externas, que la BCR hoy no usa.
 
 ## Notebooks
 
-- `notebooks/eda_produccion.ipynb` — análisis exploratorio del target: nivel,
-  índice base 2013, log y variación mensual, estacionalidad (STL), ACF/PACF,
-  estacionariedad (ADF) y outliers, para las cuatro series.
+- `notebooks/eda_produccion.ipynb` — análisis exploratorio del target, en dos
+  partes: descriptiva con toda la muestra (calidad de datos, nivel, índice base
+  2013, log y variación mensual) y de decisiones para el modelo solo con datos
+  hasta agosto 2021 (outliers, estacionalidad STL, ACF/PACF, ADF y KPSS,
+  transformación y quiebres), para las cuatro series.
 - `notebooks/replica_x13.ipynb` — réplica del X-13 de la BCR con su config
   real, descomposición, validación contra su corrida y comparación contra los
   baselines.
