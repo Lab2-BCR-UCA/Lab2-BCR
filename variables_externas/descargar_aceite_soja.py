@@ -20,7 +20,10 @@ el precio explica *cuánto* alcohol sale dentro de esa época.
 Limitación: es el precio internacional (referencia mundial de azúcar crudo;
 la definición exacta está en la hoja "Description" del mismo Excel). Los
 ingenios argentinos venden sobre todo en el mercado interno, así que es una
-aproximación a la rentabilidad que ven, no su precio real.
+aproximación a la rentabilidad que ven, no su precio real. Además el Banco
+Mundial lo publica con dos decimales (0,32; 0,34; ...): a esos niveles un
+centavo es ~3%, así que la variación mensual sale escalonada y los meses
+"sin cambio" pueden esconder movimientos chicos.
 
 Cada CSV se escribe solo si su columna se pudo leer completa; si una falla,
 el script termina con error y no pisa ningún archivo.
@@ -34,9 +37,10 @@ certificados raíz y la descarga falla con CERTIFICATE_VERIFY_FAILED. El script
 usa el bundle de ``certifi`` si está instalado (``pip install certifi``). Si no
 hay red o certificados, bajar el xlsx a mano y usar ``--input``.
 
-Uso, desde la raíz del repo (escribe los dos CSV donde los lee db/fuentes.csv):
-    python variables_externas/descargar_aceite_soja.py --output variables_externas/data
-    python variables_externas/descargar_aceite_soja.py --input CMO-Historical-Data-Monthly.xlsx --output variables_externas/data
+Uso, desde cualquier carpeta (por defecto escribe en variables_externas/data,
+que es donde los lee db/fuentes.csv):
+    python variables_externas/descargar_aceite_soja.py
+    python variables_externas/descargar_aceite_soja.py --input CMO-Historical-Data-Monthly.xlsx
 """
 import argparse
 import csv
@@ -54,6 +58,9 @@ URL = (
     "CMO-Historical-Data-Monthly.xlsx"
 )
 HOJA = "Monthly Prices"
+# Salida por defecto: la carpeta data/ al lado de este script, que es la que
+# lee db/fuentes.csv. Así no depende de desde dónde se corra.
+SALIDA = Path(__file__).resolve().parent / "data"
 # Series a extraer: (encabezado de la columna en el Excel, en minúsculas;
 # unidad que el Excel debe declarar para esa columna; CSV de salida; nombre de
 # la columna en el CSV). El encabezado se busca sin distinguir mayúsculas.
@@ -213,7 +220,8 @@ def parse_aceite(data: bytes) -> dict[str, float]:
 def main() -> None:
     """Descarga (o lee --input) y escribe un CSV por cada serie de ``SERIES``."""
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--output", default="data", help="carpeta de salida")
+    ap.add_argument("--output", default=str(SALIDA),
+                    help="carpeta de salida (por defecto variables_externas/data)")
     ap.add_argument("--input", help="xlsx local (para reproducir sin red)")
     args = ap.parse_args()
 
