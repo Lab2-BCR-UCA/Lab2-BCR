@@ -1,7 +1,8 @@
 """CCF sin leakage y tabla de candidatas (SCRUM-28).
 
 Calcula la correlación cruzada (CCF) de cada variable externa con cada serie de
-producción, sobre series diferenciadas (diferencia del logaritmo), usando **solo
+producción, sobre series diferenciadas (log-diff) y **desestacionalizadas** (resta de
+la media de cada mes), usando **solo
 datos anteriores a septiembre 2021** (inicio del backtest de SCRUM-43). Así
 ninguna decisión que alimenta al modelo mira meses del backtest o del holdout.
 
@@ -62,6 +63,14 @@ def dlog(s: pd.Series) -> pd.Series:
     return np.log(s).diff()
 
 
+def desestacionalizar(s: pd.Series) -> pd.Series:
+    """Resta la media de cada mes calendario, calculada SOLO con los datos que
+    recibe (acá, el tramo anterior a ``CORTE``). Así la desestacionalización no
+    mira el backtest, y el notebook y esta tabla usan la misma transformación.
+    """
+    return s - s.groupby(s.index.month).transform("mean")
+
+
 def mejor_rezago(prod: pd.Series, exo: pd.Series) -> tuple | None:
     """Rezago 0..MAX_LAG con mayor |correlación| entre prod[t] y exo[t-k].
 
@@ -85,12 +94,12 @@ def main() -> None:
     filas = []
     for nombre, ty in TARGETS.items():
         prod = dlog(df[ty])
-        prod = prod[prod.index < CORTE]
+        prod = desestacionalizar(prod[prod.index < CORTE])
         for ex in CANDIDATAS:
             if ex not in df.columns:
                 continue
             exo = dlog(df[ex])
-            exo = exo[exo.index < CORTE]
+            exo = desestacionalizar(exo[exo.index < CORTE])
             r = mejor_rezago(prod, exo)
             if r:
                 filas.append([nombre, ex, r[0], round(r[1], 3), r[2]])
