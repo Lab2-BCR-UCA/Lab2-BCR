@@ -31,14 +31,25 @@ from build_db import leer_dataset
 
 RAIZ = Path(__file__).resolve().parent.parent
 CORTE = pd.Timestamp("2021-09-01")  # anti-leakage: nada del backtest/holdout
-MAX_LAG = 12
 MIN_OBS = 24  # mínimo de pares para calcular una correlación
+# Rezagos con mecanismo: corto plazo (0-3) + ciclo anual (12). No se prueban
+# los rezagos 4-11: con ventana corta, un "mejor" ahí suele ser azar (igual que
+# en la selección del notebook).
+REZAGOS_PERMITIDOS = (0, 1, 2, 3, 12)
 
 TARGETS = {
     "biodiesel": "produccion_biodiesel_tn",
     "bioetanol_total": "produccion_bioetanol_total_m3",
     "bioetanol_maiz": "produccion_bioetanol_maiz_m3",
     "bioetanol_cana": "produccion_bioetanol_cana_m3",
+}
+# Inicio de entrenamiento por serie (igual que el protocolo): la CCF no mira
+# datos anteriores, así usa la misma ventana que el modelo.
+INICIO_PROTOCOLO = {
+    "biodiesel": "2008-01",
+    "bioetanol_total": "2013-01",
+    "bioetanol_maiz": "2012-09",
+    "bioetanol_cana": "2013-01",
 }
 # Candidatas con mecanismo económico (agregadas, no por grado de combustible).
 CANDIDATAS = [
@@ -57,9 +68,19 @@ CANDIDATAS = [
 
 
 def dlog(s: pd.Series) -> pd.Series:
-    """Diferencia del logaritmo (tasa de variación mensual), solo valores > 0."""
+    """Variación mensual en log, SIN diferenciar a través de huecos.
+
+    Reindexa a una grilla mensual continua antes de diferenciar: si falta un
+    mes (precios regulados con 28-41 huecos), el diff da NaN en vez de un salto
+    espurio que cruza el hueco. Es la misma transformación que ``logdiff`` del
+    notebook, para que el script y los heatmaps coincidan.
+    """
     s = s.astype(float)
-    s = s[s > 0]
+    s = s[s > 0].dropna()
+    if s.empty:
+        return s
+    grilla = pd.date_range(s.index.min(), s.index.max(), freq="MS")
+    s = s.reindex(grilla)
     return np.log(s).diff()
 
 
@@ -72,13 +93,13 @@ def desestacionalizar(s: pd.Series) -> pd.Series:
 
 
 def mejor_rezago(prod: pd.Series, exo: pd.Series) -> tuple | None:
-    """Rezago 0..MAX_LAG con mayor |correlación| entre prod[t] y exo[t-k].
+    """Rezago con mecanismo (``REZAGOS_PERMITIDOS``) de mayor |correlación|.
 
     Returns:
         ``(rezago, corr, n)`` o ``None`` si no hay suficientes pares.
     """
     mejor = None
-    for k in range(MAX_LAG + 1):
+    for k in REZAGOS_PERMITIDOS:
         j = pd.concat([prod, exo.shift(k)], axis=1).dropna()
         if len(j) >= MIN_OBS:
             c = j.iloc[:, 0].corr(j.iloc[:, 1])
@@ -93,7 +114,9 @@ def main() -> None:
     df = leer_dataset().sort_index()
     filas = []
     for nombre, ty in TARGETS.items():
-        prod = dlog(df[ty])
+        raw = df[ty]
+        raw = raw[raw.index >= pd.Timestamp(INICIO_PROTOCOLO[nombre])]  # ventana del protocolo
+        prod = dlog(raw)
         prod = desestacionalizar(prod[prod.index < CORTE])
         for ex in CANDIDATAS:
             if ex not in df.columns:
