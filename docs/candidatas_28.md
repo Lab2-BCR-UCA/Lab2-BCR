@@ -24,8 +24,8 @@ qué rezago probar, no para descartar.
   CCF.
 - **Biodiésel: ninguna variable interna tiene CCF fuerte** (todas |corr| ≤ 0,30).
   Es coherente con la descomposición contable: los *saltos* del biodiésel los
-  explican las **exportaciones**, que entran por la vía de INDEC (ticket de
-  datos aparte), no por el mercado interno.
+  explican las **exportaciones**, que entran por la vía de INDEC (SCRUM-57,
+  ya en la base), no por el mercado interno.
 
 ## Candidatas
 
@@ -63,10 +63,12 @@ qué rezago probar, no para descartar.
 
 | Variable | Decisión |
 |---|---|
-| **exportaciones_biodiesel** | Son lo que explica los **saltos mensuales** del biodiésel (la descomposición contable les atribuye ~100% de la variación). Entran por la vía de **INDEC** (rezago 0, verificado), ticket de datos aparte; esta tabla es de variables externas de mercado interno. |
+| **expo_indec_tn** + **expo_indec_oculto** (rz 0, SCRUM-57) | **Candidata principal del biodiésel.** Las exportaciones explican ~100% de la variación mensual de la producción desde sep-2021 (descomposición contable). INDEC las publica ~día 20 de t+1, antes de la estimación de la BCR; coincide con la Secretaría (99% de los meses en si hubo exportación, correlación 0,996). Los meses con monto oculto (`s`) se imputan en el constructor de features con datos hasta t-1. Sin CCF: la serie tiene muchos ceros y la diferencia del log no está definida. Ver `docs/exportaciones_indec.md`. |
+| ~~exportaciones_biodiesel~~ (Secretaría, rz 1) | **Reemplazada por INDEC.** Llega con la producción (2 meses de rezago), así que no sirve como predictor. |
 
 ## Pendiente de datos
 
 El **corte** ya está en la base (SCRUM-48, ver `docs/corte.md`); su prueba en el
-modelo va en SCRUM-31. Para biodiésel, el driver real (exportaciones de INDEC) y el
-azúcar para la caña se suman cuando estén sus tickets de datos.
+modelo va en SCRUM-31. Las exportaciones de INDEC, el driver real del biodiésel,
+también (SCRUM-57, ver `docs/exportaciones_indec.md`). Falta el azúcar para la
+caña, que se suma cuando esté su ticket de datos.
