@@ -26,7 +26,7 @@ BCR/
 ├── scripts/        # scrapers, protocolo de evaluación y modelos de referencia
 ├── results/        # métricas y salidas de los modelos
 ├── spc/            # configuración real del X-13 de la BCR (archivos .spc)
-├── docs/           # documentación (protocolo de evaluación)
+├── docs/           # documentación (protocolo de evaluación, features, fuentes)
 └── README.md
 ```
 
@@ -96,6 +96,12 @@ python scripts/replica_x13.py      # réplica del X-13 de la BCR (~15 min; --pro
 python scripts/comparar_bcr_x13.py ruta/al/BIOCOMBUSTIBLES.xlsx   # validación contra su corrida real
 python scripts/comparacion.py      # arma la tabla comparativa final
 ```
+
+Todos los modelos con variables externas (SARIMAX, elastic net, suma contable)
+arman sus predictores con el **constructor común** `scripts/construir_features.py`,
+que respeta la disponibilidad temporal de cada variable (sin leakage). Detalle,
+grupos de features y la descomposición contable del biodiésel en
+`docs/features.md`.
 
 La réplica del X-13 usa los **`.spc` reales de la BCR** (en `spc/`) tal cual:
 biodiesel y bioetanol, en log y en nivel, y aplica su **criterio de selección**
