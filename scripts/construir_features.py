@@ -48,9 +48,19 @@ descomposición contable arma, sin leakage:
 - ``otras_ventas_t1`` = ``biodiesel_otras_ventas_tn``(t-1) (rezago 1).
 
 Su suma reconstruye la mayor parte de la producción (base de la suma contable N4).
+
+Los tres volúmenes salen en **log1p** (``contables_en_log=True``, el default):
+el modelo es en log(y) y en toneladas se desestabiliza —un salto de
+exportaciones de 28 mil a 170 mil tn se multiplica y el pronóstico explota
+(review de SCRUM-62)—. ``log1p`` además tolera los ceros, que las tres tienen.
+La suma contable (N4) necesita las toneladas, así que pasa
+``contables_en_log=False``.
+
 INDEC arranca en 2012: con contables, el biodiésel entrena desde 2012 y no desde
 2008. El constructor lo avisa (``warnings.warn``) y expone el primer mes con
-contables en ``X.attrs["contables_desde"]``.
+contables en ``X.attrs["contables_desde"]``. **Al comparar con y sin contables
+hay que igualar la ventana de entrenamiento**, o la diferencia mide el cambio de
+ventana y no el aporte de las variables (review de SCRUM-62).
 
 Anti-leakage
 ------------
@@ -237,9 +247,15 @@ def _lags(y: pd.Series, idx: pd.PeriodIndex, lags=LAGS_OBJETIVO) -> pd.DataFrame
     return X
 
 
-def _contables_biodiesel(base: pd.DataFrame, idx: pd.PeriodIndex
+def _contables_biodiesel(base: pd.DataFrame, idx: pd.PeriodIndex,
+                         en_log: bool = True
                          ) -> tuple[pd.DataFrame, pd.Period | None]:
     """Descomposición contable del biodiésel (ver cabecera del módulo).
+
+    Args:
+        en_log: Si devuelve los tres volúmenes en ``log1p`` (lo que necesita un
+            modelo en log). ``False`` los deja en toneladas, para la suma
+            contable (N4), donde tienen que sumar.
 
     Returns:
         El DataFrame recortado a ``idx`` y el primer mes con contables completos
@@ -276,6 +292,16 @@ def _contables_biodiesel(base: pd.DataFrame, idx: pd.PeriodIndex
     X["expo_est"] = expo_est
     X["expo_indec_oculto"] = oculto
     X["otras_ventas_t1"] = otras_ventas_t1
+
+    if en_log:
+        # El modelo es en log(y): las contables en toneladas lo desestabilizan
+        # (un salto de exportaciones de 28 mil a 170 mil tn se multiplica y el
+        # pronóstico explota; review de SCRUM-62). Se pasan a log1p, que además
+        # tolera los ceros: las tres tienen meses en 0 (sin exportaciones, sin
+        # otras ventas, sin ventas al corte). El indicador de oculto queda 0/1.
+        for col in ("demanda_interna_est", "expo_est", "otras_ventas_t1"):
+            X[col] = np.log1p(X[col])
+
     X = X.reindex(idx)
     completas = X.dropna()
     desde = completas.index.min() if not completas.empty else None
@@ -290,6 +316,7 @@ def construir_features(
     incluir: tuple[str, ...] = ("exogenas",),
     exogenas_extra: list[tuple[str, int]] | None = None,
     exigir_fila_completa: bool = True,
+    contables_en_log: bool = True,
 ) -> tuple[pd.DataFrame, pd.Series]:
     """Arma ``(X, y)`` para un objetivo hasta ``fecha_corte``, sin leakage.
 
@@ -308,6 +335,9 @@ def construir_features(
         exigir_fila_completa: Si la fila del mes a estimar tiene algún NaN en una
             feature de datos, frena con un error que nombra la(s) variable(s) a
             actualizar en la base. ``True`` por defecto.
+        contables_en_log: Si los volúmenes contables del biodiésel van en
+            ``log1p`` (lo que necesita un modelo en log). ``False`` los deja en
+            toneladas, para la suma contable (N4).
 
     Returns:
         ``(X, y)``. ``y`` en unidades originales; ``X`` con una fila por mes
@@ -351,7 +381,7 @@ def construir_features(
         grupos["exogenas"] = list(ex.columns)
 
     if "contables" in incluir and objetivo == "biodiesel":
-        co, contables_desde = _contables_biodiesel(base, idx)
+        co, contables_desde = _contables_biodiesel(base, idx, en_log=contables_en_log)
         partes.append(co)
         grupos["contables"] = list(co.columns)
         if contables_desde is not None and contables_desde > idx[0]:
