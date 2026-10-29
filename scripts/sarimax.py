@@ -29,10 +29,28 @@ Desempeño (backtest, MAE): biodiésel 29.221, total 7.528, maíz 6.216, caña
 y 20,5 vs 26,8); empatan en biodiésel y total. El SARIMAX no es el mejor en
 ninguna serie; la mejora real para biodiésel espera las exportaciones (INDEC).
 
-Alcance (SCRUM-29): el biodiésel corre **sin exógenas** (las internas lo
-desestabilizan, ver construir_features) y la caña **sin azúcar**, porque esas
-variables todavía no están en la base. Sumarlas queda en un follow-up (SCRUM-62)
-bloqueado por SCRUM-48 (corte), SCRUM-58 (azúcar) y SCRUM-57 (INDEC).
+Alcance y exógenas (SCRUM-29 / SCRUM-62)
+----------------------------------------
+El modelo por defecto corre con el conjunto de SCRUM-29: biodiésel sin exógenas
+(SARIMA puro), bioetanol con ventas de nafta (+ margen en maíz). Con SCRUM-48
+(corte), SCRUM-57 (INDEC) y SCRUM-58 (azúcar) ya en la base, SCRUM-62 corrió la
+**ablación** (``experimento_exogenas.py``, ``results/experimento_exogenas.csv``):
+base vs base + cada candidata, backtest, MAE con IC por bootstrap + DM.
+
+Resultado: todas las candidatas con mecanismo bajan el MAE en el sentido
+esperado, pero **ninguna de forma distinguible al 95%** (IC que cruzan 0):
+biodiésel + contables −385 (p=0,92) y + corte nominal −872 (p=0,81); maíz + corte
+efectivo −617, IC95 [−1.533, 226], p=0,18; caña + azúcar −290, p=0,38. La única
+diferencia distinguible es que el corte efectivo **empeora** el total (+515,
+p=0,04). Por parsimonia (SCRUM-43: con 48 meses puede no alcanzar para
+distinguir), el SARIMAX de pronóstico queda como el de SCRUM-29.
+
+El valor de estas variables es **explicativo**, no de precisión: los contables
+(``construir_features``, grupo "contables") descomponen la producción de
+biodiésel en sus drivers (demanda del corte + exportaciones de INDEC) y alimentan
+la suma contable (N4) y las tablas de contribución (SCRUM-35) —el objetivo que la
+BCR priorizó (reunión 20/10)—. ``ModeloSARIMAX(..., incluir=("exogenas",
+"contables"))`` o ``exogenas_extra=[...]`` permiten correrlos para ese análisis.
 
 Diagnóstico e intervalos
 ------------------------
@@ -162,10 +180,21 @@ class ModeloSARIMAX:
     Fábrica: ``lambda: ModeloSARIMAX("biodiesel")``. Orden fijo por defecto.
     """
 
-    def __init__(self, objetivo: str, order=ORDER_FIJO, seasonal_order=SEASONAL_FIJO) -> None:
+    def __init__(self, objetivo: str, order=ORDER_FIJO, seasonal_order=SEASONAL_FIJO,
+                 incluir=("exogenas",), exogenas_extra=None,
+                 exigir_fila_completa: bool = True) -> None:
         self.objetivo = objetivo
         self.order = order
         self.seasonal_order = seasonal_order
+        # Grupos de features y candidatas extra que arma construir_features
+        # (SCRUM-59). Por defecto, el conjunto de SCRUM-29; la ablación de
+        # SCRUM-62 agrega "contables" o exógenas sueltas sin tocar EXOGENAS.
+        self.incluir = tuple(incluir)
+        self.exogenas_extra = exogenas_extra
+        # True (default): construir_features frena si la fila del mes a estimar
+        # tiene un insumo sin actualizar. Los anexos (diagnósticos/intervalos)
+        # lo ponen en False para mostrar el último mes estimable best-effort.
+        self.exigir_fila_completa = exigir_fila_completa
         self._res = None
         self._x_pred: pd.DataFrame | None = None
 
@@ -177,7 +206,10 @@ class ModeloSARIMAX:
         fecha_corte = y.index[-1] + 1
         y_log = np.log(y.asfreq("M"))
 
-        X, _ = construir_features(self.objetivo, fecha_corte, base=_base())
+        X, _ = construir_features(self.objetivo, fecha_corte, base=_base(),
+                                  incluir=self.incluir,
+                                  exogenas_extra=self.exogenas_extra,
+                                  exigir_fila_completa=self.exigir_fila_completa)
         x_train = X.reindex(y_log.index)
         x_pred = X.reindex([fecha_corte])
         cols = [c for c in X.columns
@@ -259,7 +291,7 @@ def diagnosticos(objetivos=tuple(OBJETIVOS)) -> pd.DataFrame:
     filas = []
     for objetivo in objetivos:
         s = _serie_base(objetivo)
-        m = ModeloSARIMAX(objetivo).fit(s)
+        m = ModeloSARIMAX(objetivo, exigir_fila_completa=False).fit(s)
         resid = pd.Series(np.asarray(m._res.resid)).iloc[13:].dropna()  # saca el burn-in
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -280,7 +312,7 @@ def intervalos_ultimo(niveles=(0.8, 0.95)) -> pd.DataFrame:
     filas = []
     for objetivo in OBJETIVOS:
         s = _serie_base(objetivo)
-        m = ModeloSARIMAX(objetivo).fit(s)
+        m = ModeloSARIMAX(objetivo, exigir_fila_completa=False).fit(s)
         iv = m.predict_intervalo(niveles)
         fila = {"serie": objetivo, "mes": str(s.index[-1] + 1), "punto": round(iv["punto"], 1)}
         for nv in niveles:
