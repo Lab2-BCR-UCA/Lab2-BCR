@@ -25,9 +25,10 @@ orden, con ``--buscar-orden``, se elige UNA vez con datos < sep-2021
 (pre-backtest) y se fija: consistente con el protocolo, sin leakage.
 
 Desempeño (backtest, MAE): biodiésel 29.221, total 7.528, maíz 6.216, caña
-7.628. El UCM tiene menor error que el SARIMAX en maíz y caña (MAPE 7,9 vs 10,4
-y 20,5 vs 26,8); empatan en biodiésel y total. El SARIMAX no es el mejor en
-ninguna serie; la mejora real para biodiésel espera las exportaciones (INDEC).
+7.628 (``results/sarimax.csv``). El UCM tiene menor error que el SARIMAX en maíz
+y caña; empatan en biodiésel y total. El SARIMAX no es el mejor en ninguna serie.
+(Los MAE del bioetanol se corren un poco según las versiones de statsmodels/numpy;
+ver la nota de reproducibilidad en ``docs/candidatas_28.md``.)
 
 Alcance y exógenas (SCRUM-29 / SCRUM-62)
 ----------------------------------------
@@ -35,19 +36,26 @@ El modelo por defecto corre con el conjunto de SCRUM-29: biodiésel sin exógena
 (SARIMA puro), bioetanol con ventas de nafta (+ margen en maíz). Con SCRUM-48
 (corte), SCRUM-57 (INDEC) y SCRUM-58 (azúcar) ya en la base, SCRUM-62 corrió la
 **ablación** (``experimento_exogenas.py``, ``results/experimento_exogenas.csv``):
-base vs base + cada candidata, backtest, MAE con IC por bootstrap + DM.
+base vs base + cada candidata, backtest, MAE con IC por bootstrap + DM, con la
+ventana de entrenamiento **igualada** y las contables en log1p.
 
-Resultado: todas las candidatas con mecanismo bajan el MAE en el sentido
-esperado, pero **ninguna de forma distinguible al 95%** (IC que cruzan 0):
-biodiésel + contables −385 (p=0,92) y + corte nominal −872 (p=0,81); maíz + corte
-efectivo −617, IC95 [−1.533, 226], p=0,18; caña + azúcar −290, p=0,38. La única
-diferencia distinguible es que el corte efectivo **empeora** el total (+515,
-p=0,04). Por parsimonia (SCRUM-43: con 48 meses puede no alcanzar para
-distinguir), el SARIMAX de pronóstico queda como el de SCRUM-29.
+Resultado: **ninguna candidata justifica entrar al modelo.**
+- Biodiésel: las contables **empeoran** (+3.239, p=0,31; con corte nominal
+  +3.522). Comparadas con la misma ventana que arrancan (2012, por INDEC), no
+  aportan precisión; la "mejora" que aparecía sin igualar la ventana era el
+  efecto de entrenar con menos años, no de las variables.
+- Maíz + corte efectivo y caña + azúcar bajan el MAE pero **no de forma
+  distinguible** (p=0,39 y p=0,37); maíz además **empeora el error máximo**
+  (24.593 vs 18.471).
+- Total + corte efectivo **empeora** y es distinguible (+537, p=0,03), pero es
+  una sola comparación al borde entre varias.
 
-El valor de estas variables es **explicativo**, no de precisión: los contables
-(``construir_features``, grupo "contables") descomponen la producción de
-biodiésel en sus drivers (demanda del corte + exportaciones de INDEC) y alimentan
+Por parsimonia, el SARIMAX de pronóstico queda como el de SCRUM-29 (biodiésel
+SARIMA puro, bioetanol con ventas de nafta + margen en maíz).
+
+El valor de las contables es **explicativo**, no de precisión: descomponen la
+producción de biodiésel en sus drivers (demanda del corte + exportaciones de
+INDEC) y alimentan
 la suma contable (N4) y las tablas de contribución (SCRUM-35) —el objetivo que la
 BCR priorizó (reunión 20/10)—. ``ModeloSARIMAX(..., incluir=("exogenas",
 "contables"))`` o ``exogenas_extra=[...]`` permiten correrlos para ese análisis.
