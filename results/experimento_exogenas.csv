@@ -1,0 +1,8 @@
+serie,variante,inicio_entrenamiento,MAE_base,MAE_variante,dif_MAE,ic95_inf,ic95_sup,dm_p_valor,error_max_base,mes_error_max_base,error_max_variante,mes_error_max_variante,mejora,distinguible_95
+biodiesel,+contables,2012-01,28555.86,31794.5,3238.64,-3104.78,9664.85,0.3115,112547.26,2022-10,102955.86,2022-05,False,False
+biodiesel,+contables+corte_nominal,2012-01,28555.86,32077.64,3521.78,-2777.6,10171.29,0.258,112547.26,2022-10,113870.82,2021-09,False,False
+bioetanol_maiz,+corte_efectivo,2012-09,6215.98,5776.73,-439.25,-1483.4,538.51,0.3875,18470.94,2024-03,24592.96,2022-11,True,False
+bioetanol_cana,+azucar,2013-01,7627.74,7330.69,-297.05,-914.27,321.99,0.3706,29050.63,2022-03,25789.46,2022-03,True,False
+bioetanol_cana,+corte_efectivo,2013-01,7627.74,7476.64,-151.11,-778.86,473.25,0.6565,29050.63,2022-03,27219.03,2022-04,True,False
+bioetanol_cana,+azucar+corte_efectivo,2013-01,7627.74,7360.14,-267.61,-1023.35,467.15,0.5067,29050.63,2022-03,24810.29,2022-04,True,False
+bioetanol_total,+corte_efectivo,2013-01,7527.81,8065.07,537.26,81.07,1011.23,0.0302,23906.34,2023-12,27535.71,2023-12,False,True

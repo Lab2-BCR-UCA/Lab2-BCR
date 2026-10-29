@@ -63,8 +63,10 @@ def _base_sintetica() -> pd.DataFrame:
 
 def test_imputacion_ocultos() -> None:
     base = _base_sintetica()
+    # en nivel: estas aserciones son sobre toneladas (el default va en log1p)
     X, _ = cf.construir_features("biodiesel", "2020-12", base=base,
-                                 con_calendario=False, incluir=("contables",))
+                                 con_calendario=False, incluir=("contables",),
+                                 contables_en_log=False)
     # Primer oculto (marzo): sin ocultos previos -> mediana de TODOS los previos
     # (ene, feb = 50) = 50, no NaN.
     assert X.loc[P("2020-03"), "expo_est"] == 50.0, X.loc[P("2020-03"), "expo_est"]
@@ -86,13 +88,37 @@ def test_imputacion_ocultos() -> None:
 def test_imputacion_no_mira_el_real_del_mes() -> None:
     base = _base_sintetica()
     X1, _ = cf.construir_features("biodiesel", "2020-12", base=base,
-                                  con_calendario=False, incluir=("contables",))
+                                  con_calendario=False, incluir=("contables",),
+                                  contables_en_log=False)
     base2 = base.copy()
     base2.loc[P("2020-09"), "biodiesel_exportaciones_tn"] = 123456.0
     X2, _ = cf.construir_features("biodiesel", "2020-12", base=base2,
-                                  con_calendario=False, incluir=("contables",))
+                                  con_calendario=False, incluir=("contables",),
+                                  contables_en_log=False)
     assert X2.loc[P("2020-09"), "expo_est"] == X1.loc[P("2020-09"), "expo_est"] == 400.0
     print("ok  la imputacion de un oculto ignora el real de la Secretaria de ese mes")
+
+
+def test_contables_en_log() -> None:
+    """Por defecto los volúmenes contables salen en log1p (el modelo es en log);
+    el indicador de oculto queda 0/1. Con contables_en_log=False, en toneladas."""
+    base = _base_sintetica()
+    kw = dict(base=base, con_calendario=False, incluir=("contables",))
+    X_log, _ = cf.construir_features("biodiesel", "2020-12", **kw)
+    X_niv, _ = cf.construir_features("biodiesel", "2020-12", contables_en_log=False, **kw)
+    for col in ("demanda_interna_est", "expo_est", "otras_ventas_t1"):
+        esperado = np.log1p(X_niv.loc[P("2020-05"), col])
+        assert abs(X_log.loc[P("2020-05"), col] - esperado) < 1e-9, col
+    # el indicador no se transforma
+    assert X_log.loc[P("2020-09"), "expo_indec_oculto"] == 1.0
+    # log1p tolera los ceros (sin inf)
+    base0 = base.copy()
+    base0.loc[P("2020-07"), "biodiesel_otras_ventas_tn"] = 0.0
+    X0, _ = cf.construir_features("biodiesel", "2020-12", base=base0,
+                                  con_calendario=False, incluir=("contables",))
+    assert np.isfinite(X0.loc[P("2020-08"), "otras_ventas_t1"])
+    assert X0.loc[P("2020-08"), "otras_ventas_t1"] == 0.0   # log1p(0) = 0
+    print("ok  contables en log1p por defecto, en nivel con contables_en_log=False")
 
 
 def test_anti_leakage_posterior_al_corte() -> None:
@@ -221,6 +247,7 @@ def test_compatibilidad_default() -> None:
 def main() -> None:
     test_imputacion_ocultos()
     test_imputacion_no_mira_el_real_del_mes()
+    test_contables_en_log()
     test_anti_leakage_posterior_al_corte()
     test_anti_leakage_mes_de_corte_rezago_1()
     test_log_fijo_no_mira_el_futuro()
