@@ -1,7 +1,9 @@
 # Protocolo de evaluación de modelos
 
 Estado: protocolo largo (SCRUM-43) con backtest de selección y holdout
-final. Pendientes de confirmación con la BCR en la sección 13.
+final. Las respuestas recibidas de la BCR se resumen en
+[`respuestas_bcr.md`](respuestas_bcr.md); solo los puntos realmente abiertos
+siguen en la sección 13.
 
 ## 1. Objetivo
 
@@ -90,7 +92,7 @@ Se aplica igual en las dos ventanas, con el mismo código de modelo
 - Holdout: primera predicción septiembre 2025, entrenando hasta agosto 2025;
   última, agosto 2026, entrenando hasta julio 2026.
 
-El equipo confirmó que su evaluación de X-13 también realiza
+La BCR confirmó que su evaluación de X-13 también realiza
 12 predicciones a un mes, reajustando el modelo en cada iteración
 con forecast maxlead=1.
 
@@ -125,8 +127,10 @@ en cada fecha histórica.
 Además del promedio, cada modelo se compara contra el naive estacional con
 la diferencia de pérdida mes a mes, d_t = pérdida(modelo) - pérdida(naive
 estacional). Negativa significa que el modelo tiene menos error. Se
-reportan dos pérdidas: error absoluto porcentual (la del MAPE) y error
-absoluto (la del MAE).
+reportan dos pérdidas: **error absoluto en toneladas o m³ (MAE, métrica
+principal)** y error absoluto porcentual (MAPE, de referencia). El cálculo
+del MAPE no cambia; solo cambia el criterio de priorización porque un mismo
+error en toneladas pesa mucho más porcentualmente en meses de baja producción.
 
 Estos intervalos son de la **diferencia de error entre dos modelos**, para
 saber si uno le gana al otro. No son intervalos de predicción: los
@@ -163,37 +167,39 @@ holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a agosto
 
 ### Resultados con datos a agosto 2026
 
-`python scripts/protocolo_largo.py`. MAPE (%). `x13_bcr` es la
+`python scripts/protocolo_largo.py`. **MAE** (toneladas para biodiésel,
+m³ para bioetanol; menor es mejor). `x13_bcr` es la
 variante que reproduce a BCR (criterio log/nivel sobre los últimos 12
 meses: log en biodiesel, nivel en bioetanol); `x13_bcr_selcompleta` aplica
 el criterio sobre toda la serie y en biodiesel termina eligiendo nivel.
+Los MAPE siguen disponibles en `results/protocolo_metricas.csv`.
 
 | Serie | Ventana | naive | naive estacional | x13_auto | x13_bcr_selcompleta | x13_bcr |
 |---|---|---|---|---|---|---|
-| Biodiesel | backtest | **24,9** | 73,6 | 32,2 | 39,0 | 34,3 |
-| Biodiesel | holdout | 18,2 | **15,8** | 21,0 | 19,7 | 21,0 |
-| Bioetanol total | backtest | 8,5 | 12,6 | **7,8** | **7,8** | **7,8** |
-| Bioetanol total | holdout | 10,3 | **5,0** | 7,5 | 7,5 | 7,5 |
-| Bioetanol maíz | backtest | 9,5 | 15,7 | **8,6** | **8,6** | 8,7 |
-| Bioetanol maíz | holdout | 6,6 | 6,6 | 6,0 | 6,0 | **5,9** |
-| Bioetanol caña | backtest | 25,9 | 28,1 | 20,8 | 20,8 | **18,4** |
-| Bioetanol caña | holdout | 28,4 | 15,5 | 16,4 | 16,4 | **15,0** |
+| Biodiesel | backtest | **23.673** | 58.671 | 27.188 | 30.089 | 28.264 |
+| Biodiesel | holdout | 16.963 | **15.708** | 18.648 | 16.602 | 18.648 |
+| Bioetanol total | backtest | 8.167 | 12.489 | 7.303 | 7.303 | **7.289** |
+| Bioetanol total | holdout | 10.882 | **5.327** | 7.911 | 7.911 | 7.911 |
+| Bioetanol maíz | backtest | 5.631 | 9.381 | **5.062** | **5.062** | 5.092 |
+| Bioetanol maíz | holdout | 4.271 | 4.391 | 3.878 | 3.878 | **3.839** |
+| Bioetanol caña | backtest | 7.849 | 8.526 | 5.812 | 5.812 | **5.282** |
+| Bioetanol caña | holdout | 9.046 | 4.405 | 4.653 | 4.653 | **4.161** |
 
 Lectura:
 
 - **En el backtest, el X-13 de BCR le gana al naive estacional en las
-  cuatro series y el intervalo no incluye el cero** en ninguna variante.
-  Diebold-Mariano da p ≤ 0,04 en biodiesel, bioetanol total y maíz, y entre
-  0,02 y 0,07 en caña según la variante.
-- **En el holdout, ningún intervalo excluye el cero** salvo dos casos en
-  contra del modelo: X-13 en log en bioetanol total y el naive en caña son
-  peores que el naive estacional. Con 12 meses no se puede distinguir
-  ningún modelo, que es justamente lo que motivó este protocolo.
-- El naive estacional de biodiesel da 73,6 % en el backtest por la caída de
-  producción de 2023: predice cada mes con el mismo mes de 2022, que tenía
-  más de 160 mil toneladas, y la producción real bajó a entre 20 y 60 mil.
-  No es un error de cálculo. Por eso en biodiesel el naive (mes anterior)
-  queda como el mejor modelo del backtest.
+  cuatro series:** con pérdida absoluta (MAE), las diferencias tienen
+  intervalos del 95 % que excluyen el cero y Diebold-Mariano da p ≤ 0,014.
+  Pero en **biodiésel el naive del mes anterior gana al X-13 BCR**:
+  MAE de 23.673 contra 28.264 tn.
+- **En el holdout de 12 meses casi todas las diferencias de MAE son
+  inconcluyentes:** la excepción frente al naive estacional es el naive
+  de caña, que resulta peor. Se reserva el holdout para confirmar y no
+  para cambiar decisiones del modelo.
+- El naive estacional de biodiésel tiene MAE de 58.671 tn (MAPE 73,6 %)
+  en el backtest por la caída de producción de 2023: predice cada mes
+  con el mismo mes de 2022, cuando se producían más de 160 mil toneladas,
+  frente a 20-60 mil en 2023. No es un error de cálculo.
 - Ordenar modelos por el holdout lleva a conclusiones distintas que el
   backtest. La comparación para decidir es la del backtest.
 
@@ -211,6 +217,10 @@ La comparación con X-13 debe utilizar pronósticos de producción original
 en las mismas unidades, no índices ni valores desestacionalizados.
 
 ## 8. Métricas
+
+**Métrica principal: MAE** en la unidad original de cada serie. MAPE,
+RMSE y acierto de signo se siguen calculando como referencias y diagnósticos;
+no se modificó la fórmula de ninguna métrica.
 
 ### MAE
 
@@ -292,7 +302,10 @@ Otros modelos podrán conectarse mediante adaptadores.
   bootstrap y Diebold-Mariano.
 - scripts/protocolo_largo.py: corre baselines y X-13 BCR en las dos ventanas.
 - results/predicciones_baselines.csv: resultados mensuales.
-- results/metricas_baselines.csv: métricas por serie y modelo.
+- results/baselines.csv: **única fuente de métricas de los baselines**
+  para el test corto (SCRUM-22); contiene también cobertura y provisorios.
+  La genera `scripts/baselines.py` y la leen `scripts/comparacion.py` y
+  `notebooks/replica_x13.ipynb`.
 - results/protocolo_predicciones.csv: predicciones por serie, modelo,
   ventana y mes.
 - results/protocolo_metricas.csv: métricas por serie, modelo y ventana.
@@ -332,8 +345,10 @@ La tabla resumen incluye:
 
 ## 12. Pruebas realizadas
 
-Se ejecutaron los dos modelos simples sobre las cuatro series,
-con 12 meses por evaluación y cobertura del 100 %.
+En la validación original de la ventana corta se ejecutaron los dos modelos
+simples sobre las cuatro series, con 12 meses por evaluación y cobertura del
+100 %. El protocolo largo posterior se valida con
+`scripts/prueba_protocolo_largo.py`.
 
 Se comprobaron:
 
@@ -342,23 +357,28 @@ Se comprobaron:
 - Las cuatro métricas con un ejemplo pequeño calculable a mano.
 - La presencia de la marca provisorio en cada mes evaluado.
 
-Los 12 meses de cada evaluación están marcados como provisorios.
+Los 12 meses de esa ventana corta están marcados como provisorios.
 No hubo valores reales iguales a cero en el período evaluado.
 
 ## 13. Pendientes de confirmación
 
-Ya confirmados:
+Ya confirmados (registro y fuentes en [`respuestas_bcr.md`](respuestas_bcr.md)):
 
 - Retraso de publicación: al estimar t, el último dato de producción es t-1
   (mail de la BCR del 9/10, SCRUM-26).
 - Configuración de X-13 de la BCR: se usan sus cuatro `.spc` y la réplica
-  coincide con los 12 pronósticos de su Excel (SCRUM-41).
+  coincide con los 12 pronósticos de su Excel (SCRUM-41). El criterio
+  elige la transformación de menor dispersión de la variación logarítmica
+  mensual de D12; **la longitud exacta de su ventana no fue confirmada**.
 - Los últimos 12 meses figuran siempre como provisorios, según confirmó la
   BCR. Por eso el holdout se informa como provisorio.
 - Reunión con la BCR del 20/10: la BCR quiere **un número concreto, sin
   rangos**, y lo que más pesa no es el valor del índice sino el **poder
   explicativo** de las variables. El pronóstico puntual es el entregable;
   los intervalos de predicción quedan como apoyo interno.
+- La BCR no tiene un día fijo de cierre previo al 25-27: puede esperar
+  datos de molienda y ventas del mes estimado o estimarlos cuando faltan.
+  Esto quedó registrado en SCRUM-26.
 
 Pendientes:
 
@@ -374,20 +394,21 @@ Pendientes:
 La ventana de test y el procedimiento walk-forward a un mes
 ya fueron acordados con el equipo.
 
-## 14. Integración futura de variables externas
+## 14. Integración de variables externas
 
-La primera versión utiliza únicamente producción histórica.
+Los baselines y el X-13 usan solo la producción histórica. El constructor
+común `scripts/construir_features.py` (SCRUM-59) ya permite preparar
+variables externas para los modelos que las requieran; SARIMAX inicial
+(SCRUM-29) está implementado y sus exógenas adicionales se siguen
+integrando en SCRUM-62. La suma contable (SCRUM-60) y elastic net
+(SCRUM-54) reutilizarán el constructor.
 
-Más adelante se incorporarán variables externas mediante una interfaz común:
-
-- fit(y_train, X_train=None).
-- predict(X_next=None).
-
-Antes de incorporarlas se acordarán nombres, unidades, fechas de
-disponibilidad, rezagos y tratamiento de faltantes.
-
-Cada predicción utilizará únicamente información disponible al
-momento de emitirla.
+La interfaz de evaluación para esos modelos debe adaptar el equivalente a
+`fit(y_train, X_train)` y `predict(X_next)` respetando la fecha de corte.
+Los nombres, unidades, rezagos y disponibilidad se documentan en
+`docs/features.md` y `docs/disponibilidad_temporal.md`. Cada predicción
+debe utilizar únicamente información disponible al momento de emitirla;
+las limitaciones por revisiones de datos están descritas en la sección 6.
 
 ## 15. Criterios de finalización
 

@@ -423,7 +423,9 @@ def walk_forward(series: dict[str, pd.Series], procesos: int) -> None:
     (pd.DataFrame(seleccion).sort_values(["serie", "fecha_pronostico"])
        .to_csv(out / "seleccion_x13_bcr.csv", index=False))
 
-    print("\nMAPE % (test {} → {}):".format(INICIO_TEST, FIN_TEST))
+    print("\nMAE (test {} → {}; tn biodiésel, m³ bioetanol):".format(INICIO_TEST, FIN_TEST))
+    print(resumen.pivot_table(index="serie", columns="modelo", values="MAE").round(0).to_string())
+    print("\nMAPE % (referencia):")
     print(resumen.pivot_table(index="serie", columns="modelo", values="MAPE_pct").round(2).to_string())
     print(f"\nGuardado en {out}/x13.csv, predicciones_x13.csv y seleccion_x13_bcr.csv")
 

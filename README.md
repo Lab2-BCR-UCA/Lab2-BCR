@@ -12,10 +12,14 @@ dos meses de retraso. Para publicar a tiempo, la BCR **estima** ese dato con
 **X-13ARIMA-SEATS**, el software estándar de ajuste estacional del Census de
 EE. UU. (el mismo que usa el INDEC).
 
-El objetivo del proyecto es **mejorar esa estimación aplicando modelos de
-machine learning** a la predicción de series de tiempo. El target es la
+El objetivo del proyecto es **estimar y explicar las variaciones** de la
+producción, comparando modelos simples, estadísticos e interpretables. En la
+reunión del 20/10 la BCR priorizó entender qué factores mueven la producción;
+por eso se recomienda el modelo más explicable cuyo error no sea
+significativamente peor que el mejor. El target es la
 **producción mensual** (toneladas de biodiesel; m³ de bioetanol total, de maíz
-y de caña), no el precio.
+y de caña), no el precio. Las respuestas registradas de la BCR están en
+[`docs/respuestas_bcr.md`](docs/respuestas_bcr.md).
 
 ## Estructura del repositorio
 
@@ -85,22 +89,27 @@ python scripts/scrape_produccion_se.py ruta/al/estadisticas_biocombustibles.xlsx
 
 ## Modelos de referencia
 
-Todo se evalúa con el **mismo protocolo** (`scripts/evaluacion.py`):
-walk-forward a un mes (el modelo se reentrena cada mes y predice el
-siguiente), ventana de test **sep-2025 → ago-2026**, métricas MAE/RMSE/MAPE y
-acierto de signo.
+Los modelos se comparan con el **protocolo largo** (SCRUM-43): walk-forward
+a un mes, **backtest de selección de sep-2021 a ago-2025 (48 meses)** y
+**holdout final de sep-2025 a ago-2026 (12 meses)**. Las decisiones de
+selección se toman solo con el backtest; el holdout se reserva para el final.
+La métrica principal es **MAE** (tn o m³); MAPE, RMSE y acierto de signo se
+informan como métricas complementarias. Ver
+[`docs/protocolo_evaluacion.md`](docs/protocolo_evaluacion.md).
 
 ```bash
-python scripts/baselines.py        # naive y naive estacional
+python scripts/protocolo_largo.py --sin-holdout   # referencias en backtest, sin usar holdout para elegir
+python scripts/baselines.py        # baselines de la ventana corta; genera results/baselines.csv
 python scripts/replica_x13.py      # réplica del X-13 de la BCR (~15 min; --procesos N para paralelizar)
 python scripts/comparar_bcr_x13.py ruta/al/BIOCOMBUSTIBLES.xlsx   # validación contra su corrida real
-python scripts/comparacion.py      # arma la tabla comparativa final
+python scripts/comparacion.py      # integra baselines.csv con x13.csv para la ventana corta
 ```
 
-Todos los modelos con variables externas (SARIMAX, elastic net, suma contable)
-arman sus predictores con el **constructor común** `scripts/construir_features.py`,
-que respeta la disponibilidad temporal de cada variable (sin leakage). Detalle,
-grupos de features y la descomposición contable del biodiésel en
+El **constructor común de features** (`scripts/construir_features.py`) ya está
+implementado y se utiliza en el trabajo de SARIMAX. Los modelos pendientes
+(elastic net y suma contable) deberán reutilizarlo y comprobar la
+disponibilidad temporal de sus variables. Detalle, grupos de features y
+descomposición contable del biodiésel en
 `docs/features.md`.
 
 La réplica del X-13 usa los **`.spc` reales de la BCR** (en `spc/`) tal cual:
@@ -110,22 +119,36 @@ modelo fijo**: el ARIMA lo elige `automdl` en cada corrida. Con datos a julio
 2026 el pronóstico de agosto coincide con el de la BCR (0,0 %). Detalle,
 tratamiento de outliers y pendientes en `docs/x13_config_bcr.md`.
 
-## Resultados (benchmark a superar)
+## Resultados de referencia (backtest largo)
 
-MAPE (%) por serie y modelo, test sep-2025 → ago-2026 (`results/comparacion.csv`):
+**MAE** sobre producción original (menor es mejor), septiembre 2021 a agosto
+2025, 48 meses. Fuente: [`results/protocolo_metricas.csv`](results/protocolo_metricas.csv).
+Los MAE de biodiésel están en **toneladas**; los de bioetanol, en **m³**.
 
-| Serie | naive | naive estacional | X-13 auto | X-13 BCR (log) | X-13 BCR (nivel) | X-13 BCR (criterio 12 m) | Mejor |
-|---|---|---|---|---|---|---|---|
-| biodiesel | 18,2 | **15,8** | 21,0 | 21,0 | 19,7 | 21,0 | naive estacional |
-| bioetanol total | 10,3 | **5,0** | 7,5 | 9,7 | 7,5 | 7,5 | naive estacional |
-| bioetanol maíz | 6,6 | 6,6 | 6,0 | 6,1 | 6,0 | **5,9** | X-13 BCR |
-| bioetanol caña | 28,4 | 15,5 | 16,4 | 15,4 | 16,4 | **15,0** | X-13 BCR |
+| Serie | Naive (mes anterior) | Naive estacional | X-13 BCR | Mejor de estos tres |
+|---|---:|---:|---:|---|
+| Biodiésel | **23.673** | 58.671 | 28.264 | Naive |
+| Bioetanol total | 8.167 | 12.489 | **7.289** | X-13 BCR |
+| Bioetanol maíz | 5.631 | 9.381 | **5.092** | X-13 BCR |
+| Bioetanol caña | 7.849 | 8.526 | **5.282** | X-13 BCR |
 
-**Hallazgo central:** con su procedimiento real, el X-13 de la BCR es superado
-por un *naive estacional* en biodiesel y bioetanol total, y en maíz y caña
-gana por poco. Ajustar el X-13 (la elección log/nivel) mueve el MAPE 1-2
-puntos; el margen grande está en cambiar de modelo (SARIMAX, ML, LSTM) y
-sumar variables externas, que la BCR hoy no usa.
+**Hallazgo principal:** en el backtest largo de biodiésel, el **naive supera
+al X-13 de la BCR** (MAE 23.673 frente a 28.264 tn). En las tres series de
+bioetanol, el X-13 BCR supera a los baselines simples. La evaluación corta
+sep-2025 → ago-2026 es ahora el **holdout**, no la ventana para elegir el
+modelo; sus resultados históricos siguen en `results/comparacion.csv`.
+
+Se prioriza MAE porque el MAPE atribuye más peso a un mismo error absoluto
+cuando la producción del mes es muy baja. **No se cambió cómo se calcula el
+MAPE**; sigue reportándose como referencia. Para la selección final, se
+comparará con Diebold-Mariano/intervalos de confianza y se preferirá el
+modelo más interpretable sin pérdida significativa de precisión (SCRUM-34).
+
+`results/baselines.csv` es el **único CSV canónico** de métricas de baselines
+para la ventana corta: lo genera `scripts/baselines.py` y lo consumen
+`scripts/comparacion.py` y `notebooks/replica_x13.ipynb`. El protocolo largo
+mantiene su propio resumen por modelo **y ventana** en
+`results/protocolo_metricas.csv` (no es un duplicado).
 
 ## Notebooks
 
@@ -136,15 +159,28 @@ sumar variables externas, que la BCR hoy no usa.
   transformación y quiebres), para las cuatro series.
 - `notebooks/replica_x13.ipynb` — réplica del X-13 de la BCR con su config
   real, descomposición, validación contra su corrida y comparación contra los
-  baselines.
+  baselines de la ventana corta. La selección final usa el backtest largo.
+- `notebooks/eda_variables_externas.ipynb` — EDA de variables candidatas;
+  su corrección y validación temporal sigue abierta en SCRUM-28.
 
 ## Estado del proyecto
 
 - [x] **Etapa 1** — Entendimiento del problema y del modelo actual de la BCR.
-- [x] **Etapa 2** — Recolección de datos (target + variables externas).
-- [x] **Etapa 3** — Análisis exploratorio (EDA del target).
-- [~] **Etapa 4** — Modelado: baselines, protocolo de evaluación y réplica del
-  X-13 **hechos**. Pendientes: variables externas, SARIMAX, ML y LSTM.
+- [x] **Etapa 2** — Recolección principal: producción, INDEC (SCRUM-57),
+  precio del azúcar (SCRUM-58) y corte obligatorio (SCRUM-48).
+- [x] **EDA del target** — EDA de producción y correcciones completadas.
+- [ ] **EDA de variables externas (SCRUM-28)** — En curso: terminar
+  tabla de candidatas y comprobaciones de fechas del backtest.
+- [x] **Referencias y evaluación** — Baselines, réplica X-13 BCR,
+  protocolo largo y constructor común de features (SCRUM-59).
+- [x] **SARIMAX inicial (SCRUM-29)** — Implementado y evaluado con alcance
+  acotado; el agregado de exógenas pendientes está en revisión (SCRUM-62).
+- [ ] **Modelado interpretable y entrega** — Faltan integrar la suma contable
+  (SCRUM-60) y elastic net (SCRUM-54), elegir el modelo final (SCRUM-34),
+  y completar el pipeline, registro e informe.
+
+Estado del backlog consultado el **29/10/2026**. Los datos y métricas
+versionados no prueban por sí solos la finalización de los tickets pendientes.
 
 ## Equipo
 

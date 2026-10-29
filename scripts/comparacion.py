@@ -1,6 +1,7 @@
 """Arma la tabla comparativa de los modelos de referencia (integración 21/22/23).
 
-Junta las métricas de los baselines (SCRUM-22, `results/baselines.csv`) y de
+Junta las métricas de los baselines (SCRUM-22, archivo canónico
+`results/baselines.csv`) y de
 las réplicas del X-13 (`results/x13.csv`), que salen del mismo protocolo de
 evaluación (SCRUM-21), en un único `results/comparacion.csv`. Es el "piso" a
 superar por los modelos propios.
@@ -58,18 +59,21 @@ def main() -> None:
     comp = pd.concat(partes, ignore_index=True)
     comp.to_csv(res / "comparacion.csv", index=False)
 
-    # resumen legible
+    # MAE es la métrica principal; MAPE queda como referencia.
+    mae = comp.pivot_table(index="serie", columns="modelo", values="MAE").round(0)
     mape = comp.pivot_table(index="serie", columns="modelo", values="MAPE_pct").round(1)
     signo = comp.pivot_table(index="serie", columns="modelo", values="acierto_signo_pct").round(0)
-    orden = [c for c in ORDEN if c in mape.columns]
-    mape, signo = mape[orden], signo[orden]
+    orden = [c for c in ORDEN if c in mae.columns]
+    mae, mape, signo = mae[orden], mape[orden], signo[orden]
 
-    print("MAPE % por serie y modelo (menor = mejor):")
+    print("MAE por serie y modelo (tn para biodiesel, m³ para bioetanol; menor = mejor):")
+    print(mae.to_string())
+    print("\nMejor modelo por serie (MAE):")
+    for s in mae.index:
+        best = mae.loc[s].idxmin()
+        print(f"  {s:16s}: {best}  ({mae.loc[s, best]:,.0f})")
+    print("\nMAPE % (referencia):")
     print(mape.to_string())
-    print("\nMejor modelo por serie:")
-    for s in mape.index:
-        best = mape.loc[s].idxmin()
-        print(f"  {s:16s}: {best}  ({mape.loc[s, best]:.1f}%)")
     print("\nAcierto de signo % (mayor = mejor):")
     print(signo.to_string())
     print(f"\nGuardado en {res / 'comparacion.csv'}")

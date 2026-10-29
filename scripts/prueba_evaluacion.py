@@ -113,10 +113,7 @@ pd.concat(detalles, ignore_index=True).to_csv(
 )
 
 tabla = pd.concat(resumenes, ignore_index=True)
-tabla.to_csv(
-    salida / "metricas_baselines.csv",
-    index=False,
-)
-
+# No escribir otro CSV de métricas: el único archivo canónico es
+# results/baselines.csv, que genera scripts/baselines.py.
 print(tabla.to_string(index=False))
-print("\nPruebas completadas. Resultados guardados en results/.")
+print("\nPruebas completadas. Predicciones guardadas en results/.")

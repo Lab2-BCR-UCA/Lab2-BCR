@@ -297,13 +297,16 @@ def main() -> None:
 
     for ventana in ventanas:
         r = resumen[resumen["ventana"] == ventana]
-        print(f"\nMAPE % ({ventana}):")
-        print(r.pivot_table(index="serie", columns="modelo", values="MAPE_pct",
-                            sort=False).round(1).to_string())
-        d = dif[(dif["ventana"] == ventana) & (dif["perdida"] == "ape")]
-        print(f"\nDiferencia de APE contra {REFERENCIA} ({ventana}), IC 95 %:")
+        print(f"\nMAE ({ventana}; tn biodiésel, m³ bioetanol; métrica principal):")
+        print(r.pivot_table(index="serie", columns="modelo", values="MAE",
+                            sort=False).round(0).to_string())
+        d = dif[(dif["ventana"] == ventana) & (dif["perdida"] == "ae")]
+        print(f"\nDiferencia de error absoluto contra {REFERENCIA} ({ventana}), IC 95 %:")
         print(d[["serie", "modelo", "diferencia_media", "ic_inf", "ic_sup",
                  "dm", "dm_p_valor"]].round(2).to_string(index=False))
+        print(f"\nMAPE % ({ventana}; referencia):")
+        print(r.pivot_table(index="serie", columns="modelo", values="MAPE_pct",
+                            sort=False).round(1).to_string())
     print(f"\nGuardado en {out}/protocolo_*.csv")
 
 
