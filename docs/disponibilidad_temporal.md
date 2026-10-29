@@ -46,10 +46,10 @@ significa usar `x[t-k]` para estimar `y[t]`.
 | Ventas de gasoil / nafta | Secretaría de Energía (SESCO) | Mensual | Días 25-27 de `t+1` | Sí | **0** | Confirmado (reunión 20/10) |
 | Corte nominal | Boletín Oficial / Sec. Energía | Mensual (por norma) | Vigente desde la norma | Sí | **0** | Confirmado |
 | Corte efectivo | Sec. Energía (ventas al corte) | Mensual | Principios de `t+2` | No | **1** | Confirmado |
-| Aceite de soja | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-49) |
+| Aceite de soja | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Confirmado (SCRUM-49, publica días 2-4 de `t+1`) |
 | Azúcar (precio internacional) | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Mismo archivo que el aceite (SCRUM-58) |
 | IPC | INDEC | Mensual | ~día 13 de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-50) |
-| Margen doméstico biodiesel | Derivada (precio / aceite × TC) | Mensual | Dentro de `t+1` | Sí | **0** | Según calendario de la fuente — depende del aceite (SCRUM-49) |
+| Margen doméstico biodiesel | Derivada (precio / aceite × TC) | Mensual | Dentro de `t+1` | Sí | **0** | Confirmado (sigue al aceite, SCRUM-49) |
 | Margen bioetanol de maíz | Derivada (precio / pizarra maíz) | Mensual | Cierre de `t` | Sí | **0** | Confirmado (SCRUM-52) |
 | Exportaciones de biodiesel | Secretaría de Energía | Mensual | Principios de `t+2` | No | **1** | Confirmado |
 
@@ -69,8 +69,13 @@ significa usar `x[t-k]` para estimar `y[t]`.
 - **Corte efectivo y exportaciones:** derivan del archivo de producción de la
   Secretaría, que llega con 2 meses de rezago, así que el último disponible es
   `t-1`.
-- **Aceite de soja (Banco Mundial):** el Pink Sheet publica a principios del
-  mes siguiente; cubre la ventana de estimación.
+- **Aceite de soja (Banco Mundial):** el Excel se actualiza en los primeros
+  días hábiles de `t+1` (el dato de septiembre 2026 salió el 2/10/2026 y la
+  próxima edición está anunciada para el 3/11/2026), antes de que salga la
+  producción de `t`. Confirmado en SCRUM-49; detalle en `docs/aceite_soja.md`.
+- **Margen doméstico del biodiesel:** sus tres insumos (precio regulado, tipo
+  de cambio y aceite) son de rezago 0 y están confirmados, así que también
+  queda confirmado.
 - **Azúcar (Banco Mundial):** sale del mismo Excel que el aceite de soja
   (columna "Sugar, world", USD/kg), así que tiene el mismo calendario y
   rezago 0. Es el precio internacional: los ingenios venden sobre todo en el

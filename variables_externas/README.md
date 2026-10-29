@@ -48,6 +48,10 @@ En el control de los 12 totales anuales publicados se encontraron diferencias de
 
 Se descartó el CSV `molienda_granos.csv` como fuente para esta tarea porque la serie descargada era anual y terminaba en 2017. La molienda de soja aproxima actividad y disponibilidad de aceite, pero no determina cuánto aceite se destina a biodiésel.
 
+### Aceite de soja y azúcar (Banco Mundial)
+
+`descargar_aceite_soja.py` baja el Excel mensual del Banco Mundial (Pink Sheet) y escribe `aceite_soja_mensual.csv` (USD/tn, enero 1960 en adelante) y `azucar_mensual.csv`. La referencia de precio, el calendario de publicación y la evaluación del FOB oficial de SAGyP como alternativa están en [`docs/aceite_soja.md`](../docs/aceite_soja.md).
+
 ### Caña de azúcar
 
 [Archivo histórico de IPAAT](https://www.ipaat.gov.ar/historico/produccion-quincenal-ddjj/3), [campaña 2013](https://www.ipaat.gov.ar/nota/85/produccion-quincenal-y-acumulada-2013) y [campaña 2026](https://www.ipaat.gov.ar/nota/744/produccion-quincenal-y-acumulada-zafra-2026).
