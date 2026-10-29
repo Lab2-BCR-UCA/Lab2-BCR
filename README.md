@@ -160,8 +160,8 @@ mantiene su propio resumen por modelo **y ventana** en
 - `notebooks/replica_x13.ipynb` — réplica del X-13 de la BCR con su config
   real, descomposición, validación contra su corrida y comparación contra los
   baselines de la ventana corta. La selección final usa el backtest largo.
-- `notebooks/eda_variables_externas.ipynb` — EDA de variables candidatas;
-  su corrección y validación temporal sigue abierta en SCRUM-28.
+- `notebooks/eda_variables_externas.ipynb` — EDA de variables candidatas,
+  correlación cruzada y criterios de disponibilidad temporal (SCRUM-28 finalizada).
 
 ## Estado del proyecto
 
@@ -169,12 +169,12 @@ mantiene su propio resumen por modelo **y ventana** en
 - [x] **Etapa 2** — Recolección principal: producción, INDEC (SCRUM-57),
   precio del azúcar (SCRUM-58) y corte obligatorio (SCRUM-48).
 - [x] **EDA del target** — EDA de producción y correcciones completadas.
-- [ ] **EDA de variables externas (SCRUM-28)** — En curso: terminar
+- [x] **EDA de variables externas (SCRUM-28)** — Finalizada: notebook,
   tabla de candidatas y comprobaciones de fechas del backtest.
 - [x] **Referencias y evaluación** — Baselines, réplica X-13 BCR,
   protocolo largo y constructor común de features (SCRUM-59).
-- [x] **SARIMAX inicial (SCRUM-29)** — Implementado y evaluado con alcance
-  acotado; el agregado de exógenas pendientes está en revisión (SCRUM-62).
+- [x] **SARIMAX (SCRUM-29 y SCRUM-62)** — Implementación inicial y
+  agregado de variables exógenas pendientes finalizados.
 - [ ] **Modelado interpretable y entrega** — Faltan integrar la suma contable
   (SCRUM-60) y elastic net (SCRUM-54), elegir el modelo final (SCRUM-34),
   y completar el pipeline, registro e informe.
