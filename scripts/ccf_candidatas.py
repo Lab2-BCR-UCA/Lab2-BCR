@@ -65,7 +65,19 @@ CANDIDATAS = [
     "margen_bioetanol_maiz",
     "margen_domestico_biodiesel",  # SCRUM-51, candidata estrella del biodiésel
     "azucar_usd_kg",  # SCRUM-58, reparto de la caña entre azúcar y alcohol
+    # SCRUM-48: cumplimiento real de la mezcla. Ojo, es casi circular (sale de las
+    # ventas al corte, que siguen a la producción); ver docs/corte.md.
+    "corte_efectivo_biodiesel",
+    "corte_efectivo_bioetanol",
+    "corte_efectivo_bioetanol_maiz",
+    "corte_efectivo_bioetanol_cana",
 ]
+# No entran acá:
+#   - corte_*_nominal_pct: es una variable de RÉGIMEN (escalones por norma), no un
+#     predictor del mes a mes; su rol está documentado aparte en docs/candidatas_28.md.
+#   - expo_indec_tn (SCRUM-57): tiene muchos meses en cero, así que la variación en
+#     log queda fragmentada y la CCF no es interpretable. Se mantiene como candidata
+#     por mecanismo (es el driver del biodiésel), con la fila en CCF s/d.
 
 
 def dlog(s: pd.Series) -> pd.Series:

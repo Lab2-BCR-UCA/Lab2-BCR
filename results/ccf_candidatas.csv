@@ -9,6 +9,10 @@ biodiesel,molienda_soja_tn,0,0.3,79
 biodiesel,margen_bioetanol_maiz,0,0.389,38
 biodiesel,margen_domestico_biodiesel,2,-0.179,41
 biodiesel,azucar_usd_kg,1,0.172,163
+biodiesel,corte_efectivo_biodiesel,0,0.26,138
+biodiesel,corte_efectivo_bioetanol,0,0.298,139
+biodiesel,corte_efectivo_bioetanol_maiz,0,0.336,107
+biodiesel,corte_efectivo_bioetanol_cana,0,0.247,139
 bioetanol_total,precio_biodiesel_ars_tn,3,-0.393,27
 bioetanol_total,precio_soja_pizarra_ars_tn,0,0.207,43
 bioetanol_total,precio_maiz_pizarra_ars_tn,12,0.231,31
@@ -19,6 +23,10 @@ bioetanol_total,molienda_soja_tn,3,0.155,76
 bioetanol_total,margen_bioetanol_maiz,3,0.212,35
 bioetanol_total,margen_domestico_biodiesel,3,0.279,40
 bioetanol_total,azucar_usd_kg,2,-0.207,103
+bioetanol_total,corte_efectivo_biodiesel,0,0.126,103
+bioetanol_total,corte_efectivo_bioetanol,0,0.7,103
+bioetanol_total,corte_efectivo_bioetanol_maiz,0,0.649,103
+bioetanol_total,corte_efectivo_bioetanol_cana,0,0.642,103
 bioetanol_maiz,precio_biodiesel_ars_tn,3,-0.242,27
 bioetanol_maiz,precio_soja_pizarra_ars_tn,1,0.181,42
 bioetanol_maiz,precio_maiz_pizarra_ars_tn,0,0.169,43
@@ -29,6 +37,10 @@ bioetanol_maiz,molienda_soja_tn,3,0.179,76
 bioetanol_maiz,margen_bioetanol_maiz,3,0.191,35
 bioetanol_maiz,margen_domestico_biodiesel,3,0.338,40
 bioetanol_maiz,azucar_usd_kg,2,-0.179,107
+bioetanol_maiz,corte_efectivo_biodiesel,0,0.203,107
+bioetanol_maiz,corte_efectivo_bioetanol,0,0.487,107
+bioetanol_maiz,corte_efectivo_bioetanol_maiz,0,0.578,107
+bioetanol_maiz,corte_efectivo_bioetanol_cana,0,0.335,107
 bioetanol_cana,precio_biodiesel_ars_tn,3,-0.333,27
 bioetanol_cana,precio_soja_pizarra_ars_tn,3,-0.131,40
 bioetanol_cana,precio_maiz_pizarra_ars_tn,12,0.179,31
@@ -39,3 +51,7 @@ bioetanol_cana,molienda_soja_tn,3,0.187,76
 bioetanol_cana,margen_bioetanol_maiz,3,0.211,35
 bioetanol_cana,margen_domestico_biodiesel,3,0.272,40
 bioetanol_cana,azucar_usd_kg,2,-0.272,103
+bioetanol_cana,corte_efectivo_biodiesel,3,0.162,103
+bioetanol_cana,corte_efectivo_bioetanol,0,0.872,103
+bioetanol_cana,corte_efectivo_bioetanol_maiz,0,0.738,103
+bioetanol_cana,corte_efectivo_bioetanol_cana,0,0.862,103
