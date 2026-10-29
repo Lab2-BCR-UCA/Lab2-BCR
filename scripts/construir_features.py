@@ -167,6 +167,10 @@ NO_LOG = {
 
 GRUPOS_VALIDOS = ("exogenas", "contables", "lags", "dummies")
 
+# Avisos ya emitidos (el walk-forward llama a esta función una vez por mes: el
+# aviso de que las contables arrancan más tarde se da una sola vez por corrida).
+_AVISADO: set = set()
+
 
 def _base_mensual(base: pd.DataFrame | None) -> pd.DataFrame:
     """Lee la base (o usa la pasada) y la devuelve con índice mensual Period."""
@@ -351,10 +355,13 @@ def construir_features(
         partes.append(co)
         grupos["contables"] = list(co.columns)
         if contables_desde is not None and contables_desde > idx[0]:
-            warnings.warn(
-                f"Las contables del biodiésel arrancan en {contables_desde} (INDEC desde "
-                f"2012): el modelo con contables entrena desde ahí, no desde {idx[0]}.",
-                stacklevel=2)
+            clave = ("contables", objetivo, str(contables_desde), str(idx[0]))
+            if clave not in _AVISADO:   # una vez por corrida, no por mes del walk-forward
+                _AVISADO.add(clave)
+                warnings.warn(
+                    f"Las contables del biodiésel arrancan en {contables_desde} (INDEC desde "
+                    f"2012): el modelo con contables entrena desde ahí, no desde {idx[0]}.",
+                    stacklevel=2)
     if "lags" in incluir:
         lg = _lags(y, idx)
         partes.append(lg)

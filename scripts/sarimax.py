@@ -38,12 +38,12 @@ El modelo por defecto corre con el conjunto de SCRUM-29: biodiésel sin exógena
 base vs base + cada candidata, backtest, MAE con IC por bootstrap + DM.
 
 Resultado: todas las candidatas con mecanismo bajan el MAE en el sentido
-esperado, pero **ninguna de forma distinguible al 95%** (IC que cruzan 0):
-biodiésel + contables −385 (p=0,92) y + corte nominal −872 (p=0,81); maíz + corte
-efectivo −617, IC95 [−1.533, 226], p=0,18; caña + azúcar −290, p=0,38. La única
-diferencia distinguible es que el corte efectivo **empeora** el total (+515,
-p=0,04). Por parsimonia (SCRUM-43: con 48 meses puede no alcanzar para
-distinguir), el SARIMAX de pronóstico queda como el de SCRUM-29.
+esperado, pero **ninguna de forma distinguible al 95%** (IC que cruzan 0, y
+ninguna llega a p<0,10): biodiésel + contables −385 (p=0,92) y + corte nominal
+−872 (p=0,81); maíz + corte efectivo −439, IC95 [−1.483, 539], p=0,39; caña +
+azúcar −297, p=0,37. La única diferencia distinguible es que el corte efectivo
+**empeora** el total (+537, p=0,03). Por parsimonia (SCRUM-43: con 48 meses puede
+no alcanzar para distinguir), el SARIMAX de pronóstico queda como el de SCRUM-29.
 
 El valor de estas variables es **explicativo**, no de precisión: los contables
 (``construir_features``, grupo "contables") descomponen la producción de

@@ -1,0 +1,8 @@
+serie,variante,MAE_base,MAE_variante,dif_MAE,ic95_inf,ic95_sup,dm_p_valor,mejora,distinguible_95
+biodiesel,+contables,29221.49,28836.28,-385.2,-7597.32,6391.68,0.917,True,False
+biodiesel,+contables+corte_nominal,29221.49,28349.3,-872.19,-8195.32,5674.56,0.8108,True,False
+bioetanol_maiz,+corte_efectivo,6215.98,5776.73,-439.25,-1483.4,538.51,0.3875,True,False
+bioetanol_cana,+azucar,7627.74,7330.69,-297.05,-914.27,321.99,0.3706,True,False
+bioetanol_cana,+corte_efectivo,7627.74,7476.64,-151.11,-778.86,473.25,0.6565,True,False
+bioetanol_cana,+azucar+corte_efectivo,7627.74,7360.14,-267.61,-1023.35,467.15,0.5067,True,False
+bioetanol_total,+corte_efectivo,7527.81,8065.07,537.26,81.07,1011.23,0.0302,False,True
