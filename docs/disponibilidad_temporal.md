@@ -49,7 +49,7 @@ significa usar `x[t-k]` para estimar `y[t]`.
 | Aceite de soja | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-49) |
 | Azúcar (precio internacional) | Banco Mundial (Pink Sheet) | Mensual | Principios de `t+1` | Sí | **0** | Mismo archivo que el aceite (SCRUM-58) |
 | IPC | INDEC | Mensual | ~día 13 de `t+1` | Sí | **0** | Según calendario de la fuente (SCRUM-50) |
-| Margen doméstico biodiesel | Derivada (precio / aceite × TC) | Mensual | Dentro de `t+1` | Sí | **0** | A confirmar (SCRUM-51) |
+| Margen doméstico biodiesel | Derivada (precio / aceite × TC) | Mensual | Dentro de `t+1` | Sí | **0** | Según calendario de la fuente — depende del aceite (SCRUM-49) |
 | Margen bioetanol de maíz | Derivada (precio / pizarra maíz) | Mensual | Cierre de `t` | Sí | **0** | Confirmado (SCRUM-52) |
 | Exportaciones de biodiesel | Secretaría de Energía | Mensual | Principios de `t+2` | No | **1** | Confirmado |
 
