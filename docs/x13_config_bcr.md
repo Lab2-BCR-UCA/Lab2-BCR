@@ -104,9 +104,16 @@ En cada iteración, X-13 corre solo con datos hasta t-1. Con esos datos reestima
 
 Si en algún momento BCR agrega outliers a mano al `.spc`, habrá que tratarlos así en el walk-forward: reidentificarlos en cada iteración, o descartar los fechados después de t.
 
-## 5. Resultados del walk-forward
+## 5. Resultados del walk-forward (ventana corta / holdout)
 
 Protocolo de `docs/protocolo_evaluacion.md`: test de septiembre 2025 a agosto 2026, a un mes, ventana expansiva, 12 de 12 meses evaluados en todos los casos.
+
+**Nota de actualización (SCRUM-43/46):** esta ventana se conserva como
+holdout histórico. La comparación para elegir modelo ahora usa el backtest
+sep-2021 a ago-2025 y la métrica principal es **MAE**. Los resultados
+actualizados están en [`../README.md`](../README.md) y
+`results/protocolo_metricas.csv`; el MAPE siguiente queda como referencia
+de la validación original del X-13.
 
 MAPE (%):
 
@@ -166,4 +173,5 @@ python scripts/comparacion.py                 # regenera results/comparacion.csv
 ## 7. Pendientes
 
 - Confirmar la ventana del criterio de selección.
-- Evaluar en el holdout de SCRUM-43. No está definido en el repo.
+- La evaluación en el backtest y el holdout se realizó en SCRUM-43;
+  el resumen está en `results/protocolo_metricas.csv`.

@@ -13,7 +13,8 @@ Uso, desde la raíz del proyecto:
 
     python scripts/baselines.py
 
-Salida: results/baselines.csv
+Salida canónica de métricas: results/baselines.csv (también la usan
+comparacion.py y notebooks/replica_x13.ipynb).
 """
 from pathlib import Path
 
@@ -64,6 +65,15 @@ def main():
                     f"Evaluación incompleta: {nombre_serie} / {nombre_modelo}"
                 )
 
+            # La salida conserva los metadatos que antes se duplicaban en
+            # metricas_baselines.csv. Las métricas no se redondean al guardar.
+            marcas = datos["provisorio"].astype(str).str.strip().str.lower()
+            if not marcas.isin(["true", "false"]).all():
+                raise ValueError(f"Marcas de provisorio inválidas en {archivo}")
+            meses_test = datos.index.to_period("M")
+            en_test = ((meses_test >= pd.Period(INICIO_TEST, freq="M")) &
+                       (meses_test <= pd.Period(FIN_TEST, freq="M")))
+
             filas.append({
                 "serie": nombre_serie,
                 "modelo": nombre_modelo,
@@ -71,10 +81,17 @@ def main():
                 "inicio_test": r["inicio_test"],
                 "fin_test": r["fin_test"],
                 "n_test": int(r["meses_evaluados"]),
-                "MAPE_pct": round(r["MAPE_pct"], 2),
-                "RMSE": round(r["RMSE"], 2),
-                "MAE": round(r["MAE"], 2),
-                "acierto_signo_pct": round(r["acierto_signo_pct"], 2),
+                "meses_previstos": int(r["meses_previstos"]),
+                "meses_evaluados": int(r["meses_evaluados"]),
+                "cobertura_pct": r["cobertura_pct"],
+                "evaluacion_completa": r["evaluacion_completa"],
+                "MAE": r["MAE"],
+                "RMSE": r["RMSE"],
+                "MAPE_pct": r["MAPE_pct"],
+                "meses_validos_MAPE": int(r["meses_validos_MAPE"]),
+                "ceros_excluidos_MAPE": int(r["ceros_excluidos_MAPE"]),
+                "acierto_signo_pct": r["acierto_signo_pct"],
+                "meses_provisorios": int((marcas.loc[en_test] == "true").sum()),
             })
 
     tabla = pd.DataFrame(filas)
