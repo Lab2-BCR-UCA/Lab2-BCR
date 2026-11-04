@@ -95,7 +95,9 @@ estaban en la base.
 | Biodiesel 9% (ene 2014) y 10% (feb 2014 - dic 2020) | Res. SE 1125/2013; Res. MEyM 37/2016 | media / alta |
 | Biodiesel 5% / 6,7% / 8,4% (ene-mar 2021) y 10% (abr-jun 2021) | Res. SE 1/2021 | alta |
 | Biodiesel 5% (jul 2021 - jun 2022) | Res. SE 624/2021 (BO 1/7/2021, art. 4) y desde el 4/8/2021 Ley 27.640 | alta |
-| Biodiesel 7,5% (desde 16/6/2022) | Res. SE 438/2022; confirmado por el IACA de septiembre 2026 de la BCR | alta |
+| Biodiesel 7,5% (16/6/2022 - 9/11/2025) | Res. SE 438/2022 | alta |
+| Biodiesel 7% (10/11/2025 - 1/1/2026) | Res. SE 445/2025 (BO 10/11/2025), reducción transitoria | alta |
+| Biodiesel 7,5% (desde 2/1/2026) | Res. SE 612/2025 (BO 2/1/2026, art. 3); confirmado por el IACA de septiembre 2026 de la BCR | alta |
 | COTAB +5% (16/6 - 16/10/2022) | DNU 330/2022; prórrogas Res. SE 636, 637 y 638/2022 | alta |
 | Bioetanol 5% (2010 - sep 2014) | Ley 26.093; confirmado por los considerandos de la Res. SE 44/2014 | alta |
 | Bioetanol 8,5% → 10% (sep-dic 2014) | Res. SE 44/2014 | alta |
@@ -104,7 +106,8 @@ estaban en la base.
 Cambios respecto de la primera versión de la tabla: se eliminó un tramo de 2%
 el 30/6/2021 que no tenía norma que lo respalde (la Res. SE 624/2021 recién
 rige desde el 1/7/2021, así que junio 2021 es 10% completo). El tramo actual de
-biodiesel es 7,5% y no 7%.
+biodiesel es 7,5%. La baja transitoria a 7% de noviembre 2025 no estaba en la
+primera versión; se agregó con las Res. SE 445/2025 y 612/2025.
 
 ### Tramos 2013-2014 (revisión de SCRUM-48)
 

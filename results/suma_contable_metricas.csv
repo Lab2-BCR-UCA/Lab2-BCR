@@ -1,0 +1,2 @@
+serie,modelo,ventana,inicio_test,fin_test,meses_previstos,meses_evaluados,cobertura_pct,evaluacion_completa,MAE,RMSE,MAPE_pct,meses_validos_MAPE,ceros_excluidos_MAPE,acierto_signo_pct
+biodiesel,suma_contable,backtest,2021-09,2025-08,48,48,100.0,True,21946.557149947166,29513.62212724563,22.426033989130232,48,0,66.66666666666666
