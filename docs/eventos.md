@@ -79,5 +79,25 @@ anterior menor a 2%". Con los datos actuales:
   estimada es gasoil del mes por corte efectivo del mes anterior
   (`docs/features.md`). Correlación con el corte efectivo t-1: −0,61.
 
-La prueba empírica (elastic net con y sin la dummy) está en SCRUM-54,
-`docs/elastic_net.md`.
+## Resultado empírico (SCRUM-54)
+
+En el elastic net del biodiésel (`docs/elastic_net.md`, backtest de 48 meses):
+
+| Variante | MAE (tn) |
+|---|---|
+| Excluyendo eventos (regla de este ticket) | 27.114 |
+| Sin excluir | 24.407 |
+| Sin excluir, con la dummy como predictor | 25.411 |
+
+- **Excluir empeora**: sin excluir el MAE baja 2.708 tn (IC 95% −4.251 a −1.434,
+  p 0,001). Los meses de 2020-2021 con corte casi nulo no enseñan una relación
+  falsa: muestran que, cuando cae el corte, cae la producción. La demanda
+  interna estimada (gasoil por corte efectivo t-1) ya captura esa caída, y
+  sacarlos le quita al modelo la variación que identifica ese efecto (su
+  coeficiente baja a menos de la mitad).
+- **La dummy no suma**: contra el modelo sin excluir, el MAE sube 1.004 tn
+  (IC +72 a +2.136, p 0,07).
+
+Conclusión: para el elastic net del biodiésel conviene no excluir. Queda la
+tabla y la función para los modelos donde sí sirvan. La decisión final por
+modelo se toma en SCRUM-34.
