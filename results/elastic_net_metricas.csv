@@ -1,0 +1,8 @@
+serie,modelo,ventana,inicio_test,fin_test,meses_previstos,meses_evaluados,cobertura_pct,evaluacion_completa,MAE,RMSE,MAPE_pct,meses_validos_MAPE,ceros_excluidos_MAPE,acierto_signo_pct
+bioetanol_maiz,elastic_net_bioetanol_maiz,backtest,2021-09,2025-08,48,48,100.0,True,5448.558072508244,6461.942678353374,8.84155997083888,48,0,70.83333333333334
+bioetanol_cana,elastic_net_bioetanol_cana,backtest,2021-09,2025-08,48,48,100.0,True,5660.565364925067,7163.195236879174,21.152215832545192,48,0,64.58333333333334
+biodiesel,elastic_net_biodiesel_sin_contables,backtest,2021-09,2025-08,48,48,100.0,True,34132.126826241394,39711.49106066287,42.616763051421614,48,0,41.66666666666667
+biodiesel,elastic_net_biodiesel_con_contables,backtest,2021-09,2025-08,48,48,100.0,True,27114.301145754434,31840.72463522654,33.74638344672818,48,0,45.83333333333333
+biodiesel,elastic_net_biodiesel_con_contables_sin_eventos,backtest,2021-09,2025-08,48,48,100.0,True,24406.633469260603,28778.190122554475,29.694803871975434,48,0,50.0
+biodiesel,elastic_net_biodiesel_con_contables_dummy_evento,backtest,2021-09,2025-08,48,48,100.0,True,25410.559221491218,29954.0576695615,30.598376410463064,48,0,45.83333333333333
+bioetanol_total,elastic_net_bioetanol_total,backtest,2021-09,2025-08,48,48,100.0,True,7241.634479874413,9320.137807476292,7.362739687178253,48,0,64.58333333333334
