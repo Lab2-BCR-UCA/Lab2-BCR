@@ -301,6 +301,10 @@ Otros modelos podrán conectarse mediante adaptadores.
 - scripts/prueba_protocolo_largo.py: pruebas de ventanas, subperíodos,
   bootstrap y Diebold-Mariano.
 - scripts/protocolo_largo.py: corre baselines y X-13 BCR en las dos ventanas.
+- scripts/eventos.py y data/eventos.csv: tabla de eventos y máscara de
+  exclusión del entrenamiento (SCRUM-53, ver sección 14 bis).
+- scripts/test_eventos.py: pruebas de la regla anti-leakage y de la
+  integración con `evaluar_modelo`.
 - results/predicciones_baselines.csv: resultados mensuales.
 - results/baselines.csv: **única fuente de métricas de los baselines**
   para el test corto (SCRUM-22); contiene también cobertura y provisorios.
@@ -409,6 +413,31 @@ Los nombres, unidades, rezagos y disponibilidad se documentan en
 `docs/features.md` y `docs/disponibilidad_temporal.md`. Cada predicción
 debe utilizar únicamente información disponible al momento de emitirla;
 las limitaciones por revisiones de datos están descritas en la sección 6.
+
+## 14 bis. Exclusión de meses del entrenamiento (SCRUM-53)
+
+`evaluar_modelo` y `evaluar_ventanas` aceptan el parámetro opcional
+`excluir`: una función `excluir(indice_entrenamiento, mes_predicho)` que
+devuelve un booleano por mes de entrenamiento (True = excluir del ajuste).
+
+    from eventos import excluir_eventos
+    evaluar_ventanas(serie, crear_modelo, inicio, ventanas,
+                     excluir=excluir_eventos("biodiesel"))
+
+- La máscara se recalcula en cada iteración del walk-forward, así que
+  refleja lo que se conocía en ese mes.
+- Regla anti-leakage: un evento de `data/eventos.csv` se usa solo si terminó
+  antes del mes que se predice. Un evento en curso no excluye nada.
+- El modelo recibe la máscara como `fit(entrenamiento, excluir=mascara)` y
+  decide cómo usarla (descartar filas, peso cero, faltantes). Si su `fit` no
+  acepta `excluir`, la evaluación se frena en vez de ignorarla en silencio.
+- Con `excluir`, el detalle suma la columna `meses_excluidos`.
+- Sin `excluir`, el protocolo no cambia: mismos resultados y mismas columnas
+  (comprobado con `baselines.py` y `prueba_evaluacion.py`).
+
+La exclusión es una opción por modelo, no una regla general. En el elastic
+net del biodiésel (SCRUM-54) excluir empeora el MAE, así que ahí conviene no
+usarla. Detalle en `docs/eventos.md`.
 
 ## 15. Criterios de finalización
 

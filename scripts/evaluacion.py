@@ -6,6 +6,8 @@
 
 #Antes de incorporarlas se acordarán nombres, unidades, fechas de disponibilidad, rezagos y tratamiento de faltantes. Cada predicción utilizará únicamente información disponible al momento de emitirla.
 
+import inspect
+
 import numpy as np
 import pandas as pd
 
@@ -42,6 +44,7 @@ def evaluar_modelo(
     fin_test="2026-08",
     nombre_serie="serie",
     nombre_modelo="modelo",
+    excluir=None,
 ):
     """
     Evalúa un modelo mediante walk-forward a un mes.
@@ -56,6 +59,14 @@ def evaluar_modelo(
         Primer mes de entrenamiento, por ejemplo "2008-01".
     inicio_test, fin_test : str
         Primer y último mes del período de evaluación.
+    excluir : callable, opcional
+        ``excluir(indice_entrenamiento, mes_predicho)`` devuelve un booleano
+        por mes de entrenamiento (True = excluir del ajuste), por ejemplo
+        ``eventos.excluir_eventos(serie)`` (SCRUM-53). Se calcula de nuevo en
+        cada iteración, así respeta lo que se conocía en ese mes. El modelo lo
+        recibe como ``fit(entrenamiento, excluir=mascara)``; si su ``fit`` no
+        acepta ese argumento, la evaluación se frena. Por defecto no se excluye
+        nada y la salida es la de siempre.
 
     Devuelve
     --------
@@ -68,6 +79,14 @@ def evaluar_modelo(
     """
     if not isinstance(serie, pd.Series):
         raise TypeError("serie debe ser una Series de pandas.")
+
+    if excluir is not None:
+        parametros = inspect.signature(crear_modelo().fit).parameters
+        if "excluir" not in parametros:
+            raise TypeError(
+                "Se pidió excluir meses pero el fit del modelo no acepta "
+                "el argumento 'excluir'."
+            )
 
     serie = serie.copy()
 
@@ -132,7 +151,18 @@ def evaluar_modelo(
 
         try:
             modelo = crear_modelo()
-            modelo.fit(entrenamiento)
+            if excluir is None:
+                modelo.fit(entrenamiento)
+            else:
+                mascara = np.asarray(
+                    excluir(entrenamiento.index, mes), dtype=bool
+                )
+                if mascara.shape != (len(entrenamiento),):
+                    raise ValueError(
+                        "La máscara de exclusión no coincide con el entrenamiento."
+                    )
+                registro["meses_excluidos"] = int(mascara.sum())
+                modelo.fit(entrenamiento, excluir=mascara)
 
             salida = np.asarray(modelo.predict(), dtype=float)
 
@@ -228,10 +258,11 @@ def ventanas_protocolo(ultimo_dato, inicio_backtest=INICIO_BACKTEST,
 
 
 def evaluar_ventanas(serie, crear_modelo, inicio_entrenamiento, ventanas,
-                     nombre_serie="serie", nombre_modelo="modelo"):
+                     nombre_serie="serie", nombre_modelo="modelo", excluir=None):
     """Corre evaluar_modelo en cada ventana y agrega la columna ``ventana``.
 
     El modelo no cambia entre ventanas: es el mismo ``crear_modelo``.
+    ``excluir`` se pasa tal cual a ``evaluar_modelo`` (SCRUM-53).
     """
     detalles, resumenes = [], []
     for nombre, (inicio, fin) in ventanas.items():
@@ -243,6 +274,7 @@ def evaluar_ventanas(serie, crear_modelo, inicio_entrenamiento, ventanas,
             fin_test=fin,
             nombre_serie=nombre_serie,
             nombre_modelo=nombre_modelo,
+            excluir=excluir,
         )
         detalle.insert(2, "ventana", nombre)
         resumen.insert(2, "ventana", nombre)
