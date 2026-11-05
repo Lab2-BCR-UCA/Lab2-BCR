@@ -1,0 +1,3 @@
+modelo,comparacion,inicio_entrenamiento,MAE_sin,MAE_con,dif_MAE,ic95_inf,ic95_sup,dm_p_valor,error_max_sin,mes_error_max_sin,error_max_con,mes_error_max_con,distinguible_95
+sarimax,base vs base+margen,2018-01,57019.74,60664.92,3645.19,-2280.28,10568.57,0.2866,838431.64,2022-02,720747.1,2022-02,False
+elastic_net_biodiesel_con_contables_sin_eventos,margen aplanado vs margen,2012-01,25312.65,24406.63,-906.01,-2104.76,-79.26,0.0994,67541.77,2021-12,66635.62,2021-12,True
