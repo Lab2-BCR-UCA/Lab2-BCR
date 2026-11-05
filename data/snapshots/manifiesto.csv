@@ -13,3 +13,7 @@ exportaciones_indec/2026-10-28.csv,exportaciones_indec,2026-10-28,6acdd570a531c0
 exportaciones_indec_tn/2026-10-28.csv,exportaciones_indec_tn,2026-10-28,7d49278aba11c2781ca3b13be08d783fc22f9c77d6c825b6f700b1fa38736812,158,commit
 azucar/2026-10-28.csv,azucar,2026-10-28,03a0f3e4df408e8ef86556f31a7697c7a8713a66fd51fdb6f408caff8735ede1,801,commit
 corte_nominal/2026-11-03.csv,corte_nominal,2026-11-03,d57a5e71889b69cb1fdc7d783276b70db613564b782a2747953db691189fa4b2,202,carga
+produccion_biodiesel/2026-11-05.csv,produccion_biodiesel,2026-11-05,b166c8b5bab63287ec03315ea9b4b53810096505fc0f9d3f7ea12eb59e923e85,225,carga
+produccion_bioetanol/2026-11-05.csv,produccion_bioetanol,2026-11-05,dcbe55e7ad2bd1666095829728a02e559544b8f7b1d6a04d6997baf48b90c379,203,carga
+combustibles/2026-11-05.csv,combustibles,2026-11-05,9d5a43b5c15e182434a8726bf0e6e71cd152e6c750be0440a9ee54d88b851f32,201,carga
+molienda_soja/2026-11-05.csv,molienda_soja,2026-11-05,a807f3627ea4b603b24413c72bc3224c16fc07a8430e3811cc774302ff5dbdc6,141,carga
