@@ -78,11 +78,12 @@ def main() -> None:
         assert _construir(raiz, "2026-10-02")["descargas"] == r1["descargas"]
         print("ok  CRLF no genera una versión falsa")
 
-        # 2. Segunda descarga: la Secretaría revisa julio y publica septiembre.
+        # 2. Segunda descarga: la Secretaría revisa julio y publica un mes nuevo.
         df = pd.read_csv(csv_bd)
         original_jul = float(df.loc[df["fecha"] == "2026-07-01", "produccion_tn"].iloc[0])
         df.loc[df["fecha"] == "2026-07-01", "produccion_tn"] = original_jul + 1000
-        nueva = df.iloc[[-1]].assign(fecha="2026-09-01", produccion_tn=150000.0)
+        mes_nuevo = (pd.Period(df["fecha"].iloc[-1], freq="M") + 1).to_timestamp().strftime("%Y-%m-%d")
+        nueva = df.iloc[[-1]].assign(fecha=mes_nuevo, produccion_tn=150000.0)
         pd.concat([df, nueva]).to_csv(csv_bd, index=False)
 
         r2 = _construir(raiz, "2026-11-05")
@@ -95,9 +96,9 @@ def main() -> None:
             "SELECT valor, fecha_descarga FROM v_ultima_version "
             "WHERE serie_id = 'produccion_biodiesel_tn' AND fecha = '2026-07-01'")
         assert ultima == [(original_jul + 1000, "2026-11-05")], ultima
-        sep = _consulta(raiz, "SELECT produccion_biodiesel_tn FROM v_dataset_mensual WHERE fecha = '2026-09-01'")
-        assert sep == [(150000.0,)], sep
-        print("ok  segunda descarga: julio conserva las dos versiones, la vista toma la nueva y suma septiembre")
+        nuevo = _consulta(raiz, "SELECT produccion_biodiesel_tn FROM v_dataset_mensual WHERE fecha = ?", (mes_nuevo,))
+        assert nuevo == [(150000.0,)], nuevo
+        print("ok  segunda descarga: julio conserva las dos versiones, la vista toma la nueva y suma el mes nuevo")
 
         # Reconstruir desde cero da el mismo resultado (la historia vive en las copias).
         (raiz / "data" / "bcr.db").unlink()
