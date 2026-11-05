@@ -25,29 +25,30 @@ Con 12 meses de test no se puede distinguir ningún modelo: en las cuatro
 series el intervalo de la diferencia de error entre X-13 y naive estacional
 incluye el cero. Por eso la evaluación se divide en dos ventanas:
 
-| Ventana | Meses (datos a agosto 2026) | Para qué se usa |
+| Ventana | Meses (datos a septiembre 2026) | Para qué se usa |
 |---|---|---|
 | Backtest de selección | septiembre 2021 a agosto 2025 (48 meses) | Todas las decisiones: variables, rezagos, hiperparámetros y modelo final. |
-| Holdout final | septiembre 2025 a agosto 2026 (12 meses) | Confirmar al final. No se usa para decidir nada. |
+| Holdout final | septiembre 2025 a septiembre 2026 (13 meses) | Confirmar al final. No se usa para decidir nada. |
 
 Reglas:
 
-- El backtest empieza siempre en septiembre 2021 y termina 12 meses antes
-  del último dato. El holdout son los últimos 12 meses. Cuando llega un mes
-  nuevo, las dos ventanas se corren un mes. Lo calcula
-  `ventanas_protocolo()` en `scripts/evaluacion.py`.
+- El backtest queda fijo entre septiembre 2021 y agosto 2025. El holdout es
+  todo lo que viene después. Cuando llega un mes nuevo se suma al holdout y
+  el backtest no cambia, para no alterar las decisiones ya tomadas
+  (SCRUM-63). Lo calcula `ventanas_protocolo()` en `scripts/evaluacion.py`.
 - El holdout se corre una sola vez, con el modelo ya elegido. Si se mira el
   holdout para cambiar algo, deja de ser holdout. Para trabajar se usa
   `python scripts/protocolo_largo.py --sin-holdout`.
 - Los baselines y el X-13 de BCR sí se reportan en el holdout porque no se
   eligen: son las referencias contra las que se compara el modelo final.
-- La ventana anterior de 12 meses (septiembre 2025 a agosto 2026) coincide
-  con el holdout, así que los resultados viejos de `results/x13.csv` y
-  `results/baselines.csv` siguen siendo comparables.
+- La ventana anterior de 12 meses (septiembre 2025 a agosto 2026) son los
+  primeros 12 meses del holdout, así que los resultados viejos de
+  `results/x13.csv` y `results/baselines.csv` se comparan solo en esos meses.
 
-Los 12 meses del holdout están marcados como provisorios en los CSV, como
-confirmó la BCR. Se mantienen y se informan siempre como provisorios: las
-métricas pueden cambiar cuando se revisen los datos reales.
+Los últimos 12 meses están marcados como provisorios en los CSV, como confirmó
+la BCR, así que 12 de los 13 meses del holdout son provisorios. Septiembre 2025
+ya dejó de serlo. Las métricas del holdout pueden cambiar cuando se revisen los
+datos reales.
 
 Todos los modelos deben evaluarse sobre los mismos meses y la misma
 versión de los datos. Una actualización de las fuentes requerirá volver
@@ -90,7 +91,7 @@ Se aplica igual en las dos ventanas, con el mismo código de modelo
 - Backtest: primera predicción septiembre 2021, entrenando hasta agosto 2021;
   última, agosto 2025.
 - Holdout: primera predicción septiembre 2025, entrenando hasta agosto 2025;
-  última, agosto 2026, entrenando hasta julio 2026.
+  última, septiembre 2026, entrenando hasta agosto 2026.
 
 La BCR confirmó que su evaluación de X-13 también realiza
 12 predicciones a un mes, reajustando el modelo en cada iteración
@@ -162,8 +163,8 @@ régimen, con los cortes de `CORTES_REGIMEN` en `scripts/evaluacion.py`:
 
 Como el backtest empieza en septiembre 2021, todo el backtest queda en el
 régimen de la Ley 27.640. El corte de noviembre 2025 cae dentro del
-holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a agosto
-2026. Con 2 y 10 meses, esos subperíodos son descriptivos, no inferenciales.
+holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a septiembre
+2026. Con 2 y 11 meses, esos subperíodos son descriptivos, no inferenciales.
 
 ### Resultados con datos a agosto 2026
 

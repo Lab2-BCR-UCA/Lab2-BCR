@@ -223,10 +223,10 @@ def evaluar_modelo(
 # Protocolo largo (SCRUM-43): backtest de selección + holdout final
 # ---------------------------------------------------------------------------
 
-# Ventanas con los datos a agosto 2026. Se recalculan con ventanas_protocolo()
-# si llegan meses nuevos.
+# El backtest queda fijo para no cambiar las decisiones ya tomadas. Los meses
+# nuevos se suman al holdout (SCRUM-63).
 INICIO_BACKTEST = "2021-09"
-LARGO_HOLDOUT = 12
+FIN_BACKTEST = "2025-08"
 
 # Cambios de régimen para reportar el error por subperíodo. Cada fecha es el
 # primer mes del régimen nuevo.
@@ -237,23 +237,26 @@ CORTES_REGIMEN = {
 
 
 def ventanas_protocolo(ultimo_dato, inicio_backtest=INICIO_BACKTEST,
-                       largo_holdout=LARGO_HOLDOUT):
+                       fin_backtest=FIN_BACKTEST):
     """Devuelve las dos ventanas del protocolo.
 
-    - backtest: desde ``inicio_backtest`` hasta ``largo_holdout`` meses antes
-      del último dato. Todas las decisiones se toman acá.
-    - holdout: los últimos ``largo_holdout`` meses. No se usa para decidir.
+    - backtest: desde ``inicio_backtest`` hasta ``fin_backtest``. Todas las
+      decisiones se toman acá.
+    - holdout: desde el mes siguiente a ``fin_backtest`` hasta el último dato.
+      No se usa para decidir.
 
     Devuelve un dict {nombre: (inicio, fin)} con meses "YYYY-MM".
     """
     ultimo = pd.Period(ultimo_dato, freq="M")
-    inicio_holdout = ultimo - (largo_holdout - 1)
-    fin_backtest = inicio_holdout - 1
-    if pd.Period(inicio_backtest, freq="M") > fin_backtest:
+    inicio = pd.Period(inicio_backtest, freq="M")
+    fin = pd.Period(fin_backtest, freq="M")
+    if inicio > fin:
         raise ValueError("El backtest queda vacío con esos parámetros.")
+    if ultimo <= fin:
+        raise ValueError("El holdout queda vacío con esos parámetros.")
     return {
-        "backtest": (str(pd.Period(inicio_backtest, freq="M")), str(fin_backtest)),
-        "holdout": (str(inicio_holdout), str(ultimo)),
+        "backtest": (str(inicio), str(fin)),
+        "holdout": (str(fin + 1), str(ultimo)),
     }
 
 

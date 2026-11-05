@@ -5,7 +5,7 @@ Corre los baselines (SCRUM-22) y el X-13 con la configuración de BCR
 
 - backtest: walk-forward a un mes desde 2021-09 hasta 12 meses antes del
   último dato. Es la ventana para tomar decisiones.
-- holdout: los últimos 12 meses. No se usa para decidir nada.
+- holdout: los meses posteriores al backtest. No se usa para decidir nada.
 
 Además del resumen de métricas, reporta el error por subperíodo (cambios de
 régimen) y la diferencia de error de cada modelo contra el naive estacional

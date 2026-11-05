@@ -91,7 +91,7 @@ python scripts/scrape_produccion_se.py ruta/al/estadisticas_biocombustibles.xlsx
 
 Los modelos se comparan con el **protocolo largo** (SCRUM-43): walk-forward
 a un mes, **backtest de selección de sep-2021 a ago-2025 (48 meses)** y
-**holdout final de sep-2025 a ago-2026 (12 meses)**. Las decisiones de
+**holdout final de sep-2025 a sep-2026 (13 meses)**. Las decisiones de
 selección se toman solo con el backtest; el holdout se reserva para el final.
 La métrica principal es **MAE** (tn o m³); MAPE, RMSE y acierto de signo se
 informan como métricas complementarias. Ver
