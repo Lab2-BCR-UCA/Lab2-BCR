@@ -141,8 +141,9 @@ oferta suficiente) y por encima desde mediados de 2013.
 la restricción que opera: la regla real eran los cupos. Ese tramo no es un
 cambio de régimen por norma; para capturarlo sirve el efectivo o la brecha
 efectivo − nominal, no el nominal solo. La brecha no se probó (SCRUM-31 no la
-incluyó): el tramo queda antes del backtest y solo afecta el entrenamiento, y el
-efectivo ya entra con rezago 1 en el SARIMAX y en el elastic net.
+incluyó): el tramo queda antes del backtest y solo afecta el entrenamiento. El
+efectivo entra con rezago 1 solo en el elastic net; en el SARIMAX se probó en
+SCRUM-62 y quedó afuera (EXOGENAS no lo incluye).
 
 Pendientes menores (no cambian valores mensuales salvo por días):
 
