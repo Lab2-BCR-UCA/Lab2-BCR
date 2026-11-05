@@ -1,0 +1,2 @@
+serie,variante,inicio_entrenamiento,MAE_base,MAE_variante,dif_MAE,ic95_inf,ic95_sup,dm_p_valor,error_max_base,mes_error_max_base,error_max_variante,mes_error_max_variante,mejora,distinguible_95
+biodiesel,+margen_domestico,2018-01,57019.74,60664.92,3645.19,-2280.28,10568.57,0.2866,838431.64,2022-02,720747.1,2022-02,False,False

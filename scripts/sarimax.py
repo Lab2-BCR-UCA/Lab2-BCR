@@ -190,7 +190,8 @@ class ModeloSARIMAX:
 
     def __init__(self, objetivo: str, order=ORDER_FIJO, seasonal_order=SEASONAL_FIJO,
                  incluir=("exogenas",), exogenas_extra=None,
-                 exigir_fila_completa: bool = True) -> None:
+                 exigir_fila_completa: bool = True,
+                 transformacion: str = "log") -> None:
         self.objetivo = objetivo
         self.order = order
         self.seasonal_order = seasonal_order
@@ -203,6 +204,14 @@ class ModeloSARIMAX:
         # tiene un insumo sin actualizar. Los anexos (diagnósticos/intervalos)
         # lo ponen en False para mostrar el último mes estimable best-effort.
         self.exigir_fila_completa = exigir_fila_completa
+        # Transformación de la serie objetivo: "log" (default, SCRUM-29) o
+        # "nivel" (sin transformar). El EDA (SCRUM-45 parte B) concluye nivel
+        # para total y maíz; la comparación formal está en SCRUM-31
+        # (experimento_transformacion.py). Solo cambia cómo entra y sale y; las
+        # exógenas y el orden no se tocan.
+        if transformacion not in ("log", "nivel"):
+            raise ValueError("transformacion debe ser 'log' o 'nivel'.")
+        self.transformacion = transformacion
         self._res = None
         self._x_pred: pd.DataFrame | None = None
 
@@ -212,7 +221,11 @@ class ModeloSARIMAX:
             y.index = pd.PeriodIndex(pd.to_datetime(y.index), freq="M")
         y = y.sort_index().astype(float)
         fecha_corte = y.index[-1] + 1
-        y_log = np.log(y.asfreq("M"))
+        # y_log: la serie en la escala del modelo (log, o el nivel sin
+        # transformar si transformacion="nivel"). Se mantiene el nombre para no
+        # tocar el resto del ajuste; predict revierte según la transformación.
+        y_mes = y.asfreq("M")
+        y_log = np.log(y_mes) if self.transformacion == "log" else y_mes
 
         X, _ = construir_features(self.objetivo, fecha_corte, base=_base(),
                                   incluir=self.incluir,
@@ -245,7 +258,8 @@ class ModeloSARIMAX:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             f = self._res.forecast(1, exog=self._x_pred)
-        return float(np.exp(np.asarray(f)[0]))
+        val = float(np.asarray(f)[0])
+        return float(np.exp(val)) if self.transformacion == "log" else max(0.0, val)
 
     def predict_intervalo(self, niveles=(0.8, 0.95)) -> dict:
         """Pronóstico puntual + bandas por nivel (en unidades originales).
@@ -256,10 +270,12 @@ class ModeloSARIMAX:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             fc = self._res.get_forecast(1, exog=self._x_pred)
-        out = {"punto": float(np.exp(np.asarray(fc.predicted_mean)[0]))}
+        rev = ((lambda v: float(np.exp(v))) if self.transformacion == "log"
+               else (lambda v: max(0.0, float(v))))
+        out = {"punto": rev(np.asarray(fc.predicted_mean)[0])}
         for nv in niveles:
             ci = np.asarray(fc.conf_int(alpha=1 - nv))
-            out[nv] = (float(np.exp(ci[0, 0])), float(np.exp(ci[0, 1])))
+            out[nv] = (rev(ci[0, 0]), rev(ci[0, 1]))
         return out
 
 
