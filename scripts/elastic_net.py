@@ -109,6 +109,11 @@ class Config:
     contables: bool = False
     eventos: bool = True
     dummy_evento: bool = False
+    # Variables cuyo VALOR se neutraliza (constante donde hay dato) pero que
+    # conservan sus NaN, así el indicador de faltante del imputador se mantiene.
+    # Sirve para medir el aporte del valor sin perder la dummy de "antes de que
+    # exista la serie" (SCRUM-31, margen doméstico desde 2018).
+    aplanar: tuple = ()
 
 
 MODELOS: dict[str, Config] = {
@@ -171,6 +176,10 @@ def armar_X(config: Config, fecha_corte: pd.Period, base: pd.DataFrame) -> tuple
         ce.index = _a_periodos(ce.index)
         X["dummy_corte_bajo_t1"] = (ce.shift(1) < 2).astype(float).reindex(X.index)
         X.loc[ce.shift(1).reindex(X.index).isna(), "dummy_corte_bajo_t1"] = np.nan
+    for col in config.aplanar:
+        if col not in X.columns:
+            raise KeyError(f"No se puede aplanar '{col}': no está entre las features.")
+        X.loc[X[col].notna(), col] = 0.0
     X = X.loc[pd.Period(config.inicio, freq="M"):]
     return X, y
 

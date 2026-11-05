@@ -81,8 +81,12 @@ estaban en la base.
 - **Cuidado con el efectivo como predictor.** Está muy correlacionado con la
   producción del mes anterior (las ventas al corte son la mayor parte de la
   producción), así que puede aportar poco por encima del propio rezago del
-  target. La prueba (sin corte / efectivo / efectivo + nominal) se hace en
-  SCRUM-31.
+  target. La prueba sin corte / con efectivo la hizo SCRUM-62 en el SARIMAX
+  (`results/experimento_exogenas.csv`: no distinguible en maíz y caña, empeora
+  el total) y SCRUM-31 la lee en el elastic net (`docs/aporte_variables.md`:
+  entra siempre en maíz, pero como inercia). Efectivo + nominal no se prueba en
+  bioetanol: el nominal está fijo en 12% desde 2016, así que no varía en el
+  backtest.
 
 ## Verificación de los tramos
 
@@ -136,7 +140,9 @@ oferta suficiente) y por encima desde mediados de 2013.
 **Implicancia para el modelo.** En bioetanol 2012 - ago 2014 el nominal no es
 la restricción que opera: la regla real eran los cupos. Ese tramo no es un
 cambio de régimen por norma; para capturarlo sirve el efectivo o la brecha
-efectivo − nominal, no el nominal solo. A tener en cuenta en SCRUM-31.
+efectivo − nominal, no el nominal solo. La brecha no se probó (SCRUM-31 no la
+incluyó): el tramo queda antes del backtest y solo afecta el entrenamiento, y el
+efectivo ya entra con rezago 1 en el SARIMAX y en el elastic net.
 
 Pendientes menores (no cambian valores mensuales salvo por días):
 

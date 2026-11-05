@@ -80,9 +80,35 @@ def test_coeficientes_y_prediccion():
     print("ok  coeficientes en unidades y predicción reconstruible por aportes")
 
 
+def test_aplanar_mantiene_indicador():
+    """Aplanar neutraliza el valor de la variable pero conserva su indicador de faltante."""
+    import dataclasses
+    col = "margen_domestico_biodiesel"
+    X, _ = armar_X(CFG, MES, BASE)
+    Xp, _ = armar_X(dataclasses.replace(CFG, aplanar=(col,)), MES, BASE)
+    assert X[col].isna().sum() > 0                          # hay meses antes de 2018
+    assert X[col].isna().equals(Xp[col].isna())             # mismos NaN -> mismo indicador
+    assert (Xp[col].dropna() == 0.0).all()                  # el valor queda constante
+    assert X.drop(columns=col).equals(Xp.drop(columns=col)) # el resto no cambia
+    m = ModeloElasticNet(dataclasses.replace(CFG, aplanar=(col,)), BASE)
+    serie = serie_objetivo(CFG.objetivo, BASE)
+    serie = serie[(serie.index < MES) & (serie.index >= pd.Period(CFG.inicio, "M"))]
+    coefs = m.fit(serie).coeficientes().set_index("variable")["coef_estandarizado"]
+    assert coefs[col] == 0.0                                # sin varianza: no aporta
+    assert any(col in v and "missing" in v for v in coefs.index)
+    try:
+        armar_X(dataclasses.replace(CFG, aplanar=("no_existe",)), MES, BASE)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("aplanar una variable ausente debió frenar")
+    print("ok  aplanar neutraliza el valor y conserva el indicador de faltante")
+
+
 if __name__ == "__main__":
     test_sin_leakage()
     test_transformaciones_solo_con_entrenamiento()
     test_excluye_eventos()
     test_coeficientes_y_prediccion()
+    test_aplanar_mantiene_indicador()
     print("\nTodas las pruebas del elastic net pasaron.")
