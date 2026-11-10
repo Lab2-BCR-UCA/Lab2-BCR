@@ -155,6 +155,9 @@ El archivo SQLite es local y no se versiona.
 - results/iaca_backtest_detalle.csv
 - results/iaca_backtest_metricas.csv
 - results/iaca_backtest_discrepancias.csv
+- results/iaca_holdout_detalle.csv
+- results/iaca_holdout_metricas.csv
+- results/iaca_holdout_discrepancias.csv
 
 ## 9. Ejecución
 
@@ -177,11 +180,16 @@ Evaluar otro modelo del protocolo:
     python scripts/error_iaca.py --modelo-final NOMBRE_MODELO
 
 El modelo tiene que tener sus predicciones en
-`results/protocolo_predicciones.csv`.
+`results/protocolo_predicciones.csv` o en un CSV con el mismo
+formato que se pasa con `--predicciones-extra`. Si un nombre de
+modelo está en los dos archivos, el script frena.
+
+Modelo final (SCRUM-34), backtest y holdout:
+
+    python scripts/error_iaca.py --modelo-final modelo_final --predicciones-extra results/modelo_final_predicciones.csv
+    python scripts/error_iaca.py --ventana holdout --modelo-final modelo_final --predicciones-extra results/modelo_final_predicciones.csv
 
 ## 10. Pendientes
 
 No quedan pendientes dentro de SCRUM-42. La métrica del modelo
-final se calcula en SCRUM-34, que tiene que dejar sus
-predicciones en `results/protocolo_predicciones.csv`: hoy la
-suma contable y el elastic net las guardan en archivos propios.
+final está en `docs/comparacion_final.md` (sección 7).

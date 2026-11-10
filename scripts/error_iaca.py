@@ -381,6 +381,20 @@ def evaluar(args: argparse.Namespace) -> None:
         parse_dates=["fecha"],
     )
 
+    # Predicciones de modelos que no corre el protocolo largo (por ejemplo,
+    # el modelo final de SCRUM-34). Mismo formato de columnas.
+    if args.predicciones_extra:
+        extra = pd.read_csv(
+            args.predicciones_extra,
+            parse_dates=["fecha"],
+        )
+        repetidos = set(extra["modelo"]) & set(tabla["modelo"])
+        if repetidos:
+            raise ValueError(
+                f"Modelos repetidos con el protocolo: {sorted(repetidos)}"
+            )
+        tabla = pd.concat([tabla, extra], ignore_index=True)
+
     tabla["mes"] = (
         tabla["fecha"].dt.to_period("M")
     )
@@ -795,7 +809,13 @@ def main() -> None:
 
     parser.add_argument(
         "--modelo-final",
-        help="Modelo existente en protocolo_predicciones.csv.",
+        help="Modelo existente en protocolo_predicciones.csv o en --predicciones-extra.",
+    )
+
+    parser.add_argument(
+        "--predicciones-extra",
+        help="CSV con predicciones de otros modelos, mismo formato "
+             "(por ejemplo results/modelo_final_predicciones.csv).",
     )
 
     args = parser.parse_args()

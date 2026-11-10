@@ -47,7 +47,7 @@ Salidas en results/:
     elastic_net_predicciones.csv   predicción y error por modelo y mes
     elastic_net_metricas.csv       métricas por modelo y ventana
     elastic_net_coeficientes.csv   coeficiente de cada variable en cada iteración
-    elastic_net_seleccion.csv      frecuencia de selección y signo por variable
+    elastic_net_seleccion.csv      frecuencia de selección y signo por variable (solo backtest)
     elastic_net_diferencias.csv    Diebold-Mariano contra las referencias
 
 Requiere haber corrido ``protocolo_largo.py`` (naive y X-13 BCR). La comparación
@@ -78,7 +78,7 @@ sys.path.insert(0, str(RAIZ / "scripts"))
 
 from build_db import leer_dataset  # noqa: E402
 from construir_features import OBJETIVOS, construir_features  # noqa: E402
-from evaluacion import comparar_modelos, evaluar_ventanas, ventanas_protocolo  # noqa: E402
+from evaluacion import FIN_BACKTEST, comparar_modelos, evaluar_ventanas, ventanas_protocolo  # noqa: E402
 from eventos import excluir_eventos  # noqa: E402
 
 ALPHAS = np.logspace(-3, 1, 20)          # sobre y estandarizada
@@ -421,7 +421,11 @@ def main() -> None:
     detalle.to_csv(out / "elastic_net_predicciones.csv", index=False)
     metrica.to_csv(out / "elastic_net_metricas.csv", index=False)
     coef.to_csv(out / "elastic_net_coeficientes.csv", index=False)
-    resumen_seleccion(coef).to_csv(out / "elastic_net_seleccion.csv", index=False)
+    # La selección se resume solo con el backtest: el holdout no se usa para
+    # describir ni decidir nada (protocolo, SCRUM-43).
+    fin = pd.Period(FIN_BACKTEST, freq="M").to_timestamp(how="end")
+    resumen_seleccion(coef[pd.to_datetime(coef["fecha"]) <= fin]).to_csv(
+        out / "elastic_net_seleccion.csv", index=False)
     diferencias.to_csv(out / "elastic_net_diferencias.csv", index=False)
 
     print(metrica[["serie", "modelo", "ventana", "MAE", "MAPE_pct", "acierto_signo_pct",

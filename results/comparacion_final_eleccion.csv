@@ -1,0 +1,5 @@
+serie,elegido,MAE_elegido,mejor,MAE_mejor,motivo,descartados_por_ser_peores,dif_vs_naive,p_vs_naive,le_gana_claramente_a_naive,dif_vs_x13_bcr,p_vs_x13_bcr,le_gana_claramente_a_x13_bcr
+biodiesel,suma_contable,21946.557149947166,suma_contable,21946.557149947166,es el de menor MAE,,-1726.4113917195002,0.5724504697382337,False,-6317.701859446137,0.09791089622875077,False
+bioetanol_maiz,elastic_net_bioetanol_maiz,5448.558072508244,x13_bcr,5091.975682347495,"no es significativamente peor que x13_bcr (dif +357, p = 0.496)",,-182.78338582508908,0.7587398795961549,False,356.5823901607477,0.495618770848521,False
+bioetanol_cana,elastic_net_bioetanol_cana,5660.565364925067,x13_bcr,5281.622026999496,"no es significativamente peor que x13_bcr (dif +379, p = 0.679)",,-2188.916093408267,0.0019567273252931927,True,378.9433379255707,0.6794006804325565,False
+bioetanol_total,elastic_net_bioetanol_total,7241.634479874413,elastic_net_bioetanol_total,7241.634479874413,es el de menor MAE,,-925.1434367922529,0.29487761424227465,False,-47.43018419863961,0.953975617454035,False
