@@ -76,7 +76,7 @@ Uso, desde la raíz del proyecto:
     python scripts/sarimax.py --diagnosticos  # Ljung-Box + Jarque-Bera por serie
     python scripts/sarimax.py --intervalos    # bandas 80/95 del último mes (anexo)
 
-Salida: results/sarimax.csv. Requiere: pip install statsmodels scipy pandas numpy
+Salida: results/sarimax.csv y results/sarimax_predicciones.csv. Requiere: pip install statsmodels scipy pandas numpy
 """
 
 from __future__ import annotations
@@ -389,9 +389,9 @@ def main() -> None:
         ("bioetanol_total", "suma_maiz_cana", lambda: ModeloSARIMAXSumaTotal()),
     ]
 
-    resumenes = []
+    resumenes, detalles = [], []
     for objetivo, variante, crear in configs:
-        _, resumen = evaluar_ventanas(
+        detalle, resumen = evaluar_ventanas(
             serie=series[objetivo],
             crear_modelo=crear,
             inicio_entrenamiento=INICIO_ENTRENAMIENTO[objetivo],
@@ -401,11 +401,16 @@ def main() -> None:
         )
         resumen["variante"] = variante
         resumenes.append(resumen)
+        detalles.append(detalle)
 
     resumen = pd.concat(resumenes, ignore_index=True)
     out = RAIZ / "results"
     out.mkdir(exist_ok=True)
     resumen.to_csv(out / "sarimax.csv", index=False)
+    # Predicciones mes a mes, mismo formato que el resto de los modelos:
+    # las usa la comparación final (SCRUM-34) para Diebold-Mariano.
+    pd.concat(detalles, ignore_index=True).to_csv(
+        out / "sarimax_predicciones.csv", index=False)
 
     # MAE es la métrica principal (decisión del 27/10); MAPE como referencia.
     for ventana in ventanas:
@@ -413,7 +418,7 @@ def main() -> None:
         print(f"\n{ventana} (MAE = métrica principal):")
         print(r[["serie", "variante", "MAE", "MAPE_pct", "meses_evaluados"]]
               .round(2).to_string(index=False))
-    print(f"\nGuardado en {out / 'sarimax.csv'}")
+    print(f"\nGuardado en {out / 'sarimax.csv'} y sarimax_predicciones.csv")
     print("Comparación formal (MAE + DM/bootstrap vs naive_estacional): protocolo_largo.py")
 
 

@@ -1,0 +1,5 @@
+serie,modelo,ventana,meses,error_medio_absoluto_pp,error_medio_pp,aciertos,acierto_signo_pct
+biodiesel,modelo_final,holdout,13,8.955636842282862,-3.1613243585653588,7,53.84615384615385
+biodiesel,x13_bcr,holdout,13,12.262643386287136,4.611322517744739,7,53.84615384615385
+bioetanol_total,modelo_final,holdout,13,4.948581537155713,-2.018798578740857,7,53.84615384615385
+bioetanol_total,x13_bcr,holdout,13,4.497389576747489,0.44747061487568485,8,61.53846153846154
