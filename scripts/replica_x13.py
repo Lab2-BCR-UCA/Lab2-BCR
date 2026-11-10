@@ -137,7 +137,7 @@ def _correr(spec: str) -> dict[str, str]:
                        text=True, timeout=600)
         salida = {}
         for p in Path(tmp).iterdir():
-            if p.stem == "run" and p.suffix in (".fct", ".d12", ".html"):
+            if p.stem == "run" and p.suffix in (".fct", ".c17", ".d11", ".d12", ".d16", ".html"):
                 salida[p.suffix[1:]] = p.read_text(encoding="latin-1")
         err = Path(tmp) / "run_err.html"
         if err.exists():
