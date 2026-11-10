@@ -3,8 +3,8 @@
 Corre los baselines (SCRUM-22) y el X-13 con la configuración de BCR
 (SCRUM-41) sobre las dos ventanas de docs/protocolo_evaluacion.md:
 
-- backtest: walk-forward a un mes desde 2021-09 hasta 12 meses antes del
-  último dato. Es la ventana para tomar decisiones.
+- backtest: walk-forward a un mes desde 2021-09 hasta 2025-08
+  (FIN_BACKTEST en evaluacion.py, fijo). Es la ventana para tomar decisiones.
 - holdout: los meses posteriores al backtest. No se usa para decidir nada.
 
 Además del resumen de métricas, reporta el error por subperíodo (cambios de

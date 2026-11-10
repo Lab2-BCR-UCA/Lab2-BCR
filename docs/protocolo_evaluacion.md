@@ -166,9 +166,11 @@ régimen de la Ley 27.640. El corte de noviembre 2025 cae dentro del
 holdout: lo divide en septiembre a octubre 2025 y noviembre 2025 a septiembre
 2026. Con 2 y 11 meses, esos subperíodos son descriptivos, no inferenciales.
 
-### Resultados con datos a agosto 2026
+### Resultados con datos a septiembre 2026
 
-`python scripts/protocolo_largo.py`. **MAE** (toneladas para biodiésel,
+`python scripts/protocolo_largo.py`, con el holdout de 13 meses (septiembre
+2025 a septiembre 2026). El backtest da idéntico a la corrida con datos a
+agosto 2026: sus datos de entrada no cambiaron. **MAE** (toneladas para biodiésel,
 m³ para bioetanol; menor es mejor). `x13_bcr` es la
 variante que reproduce a BCR (criterio log/nivel sobre los últimos 12
 meses: log en biodiesel, nivel en bioetanol); `x13_bcr_selcompleta` aplica
@@ -178,13 +180,13 @@ Los MAPE siguen disponibles en `results/protocolo_metricas.csv`.
 | Serie | Ventana | naive | naive estacional | x13_auto | x13_bcr_selcompleta | x13_bcr |
 |---|---|---|---|---|---|---|
 | Biodiesel | backtest | **23.673** | 58.671 | 27.188 | 30.089 | 28.264 |
-| Biodiesel | holdout | 16.963 | **15.708** | 18.648 | 16.602 | 18.648 |
+| Biodiesel | holdout | 15.834 | 17.808 | 17.361 | **15.471** | 17.360 |
 | Bioetanol total | backtest | 8.167 | 12.489 | 7.303 | 7.303 | **7.289** |
-| Bioetanol total | holdout | 10.882 | **5.327** | 7.911 | 7.911 | 7.911 |
+| Bioetanol total | holdout | 10.756 | **5.948** | 7.372 | 7.372 | 7.372 |
 | Bioetanol maíz | backtest | 5.631 | 9.381 | **5.062** | **5.062** | 5.092 |
-| Bioetanol maíz | holdout | 4.271 | 4.391 | 3.878 | 3.878 | **3.839** |
+| Bioetanol maíz | holdout | 4.035 | 5.465 | 3.848 | 3.848 | **3.812** |
 | Bioetanol caña | backtest | 7.849 | 8.526 | 5.812 | 5.812 | **5.282** |
-| Bioetanol caña | holdout | 9.046 | 4.405 | 4.653 | 4.653 | **4.161** |
+| Bioetanol caña | holdout | 9.154 | 4.447 | 4.743 | 4.743 | **4.289** |
 
 Lectura:
 
@@ -193,7 +195,7 @@ Lectura:
   intervalos del 95 % que excluyen el cero y Diebold-Mariano da p ≤ 0,014.
   Pero en **biodiésel el naive del mes anterior gana al X-13 BCR**:
   MAE de 23.673 contra 28.264 tn.
-- **En el holdout de 12 meses casi todas las diferencias de MAE son
+- **En el holdout de 13 meses casi todas las diferencias de MAE son
   inconcluyentes:** la excepción frente al naive estacional es el naive
   de caña, que resulta peor. Se reserva el holdout para confirmar y no
   para cambiar decisiones del modelo.
