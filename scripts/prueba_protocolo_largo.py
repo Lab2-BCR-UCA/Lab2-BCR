@@ -30,9 +30,19 @@ ventanas = ventanas_protocolo("2026-08")
 assert ventanas == {"backtest": ("2021-09", "2025-08"), "holdout": ("2025-09", "2026-08")}
 assert len(pd.period_range(*ventanas["backtest"], freq="M")) == 48
 
-# Si llega un mes nuevo, las dos ventanas se corren un mes.
-assert ventanas_protocolo("2026-09")["holdout"] == ("2025-10", "2026-09")
-assert ventanas_protocolo("2026-09")["backtest"] == ("2021-09", "2025-09")
+# Si llega un mes nuevo, se suma al holdout y el backtest no cambia.
+ventanas_nuevas = ventanas_protocolo("2026-09")
+assert ventanas_nuevas == {"backtest": ("2021-09", "2025-08"), "holdout": ("2025-09", "2026-09")}
+assert len(pd.period_range(*ventanas_nuevas["holdout"], freq="M")) == 13
+assert ventanas_protocolo("2026-10")["backtest"] == ("2021-09", "2025-08")
+
+# Sin meses después del backtest no hay holdout: se frena en vez de seguir.
+try:
+    ventanas_protocolo("2025-08")
+except ValueError:
+    pass
+else:
+    raise AssertionError("ventanas_protocolo debía frenar con el holdout vacío")
 
 
 # 2. evaluar_ventanas da lo mismo que evaluar_modelo en cada ventana.
