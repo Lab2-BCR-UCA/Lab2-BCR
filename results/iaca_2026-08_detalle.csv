@@ -1,3 +1,3 @@
-serie,modelo,ventana,fecha,variante_x13,produccion_pronosticada,produccion_real,indice_pronosticado,variacion_pronosticada_pct,variacion_con_real_pct,error_pp,error_absoluto_pp,acierto_signo
-biodiesel,x13_bcr,holdout,2026-08,log,103922.605358085,146603.63,53.208913869947764,3.047256818027651,28.28399843648539,-25.23674161845774,25.23674161845774,1
-bioetanol_total,x13_bcr,holdout,2026-08,nivel,140393.718159332,139521.0,296.43838884189927,2.303722131840414,1.8038913823278362,0.499830749512578,0.499830749512578,1
+serie,modelo,ventana,fecha,variante_x13,produccion_pronosticada,produccion_real,indice_pronosticado,variacion_pronosticada_pct,variacion_con_real_pct,error_pp,error_absoluto_pp,acierto_signo,pronostico_x13_protocolo,pronostico_x13_recalculado,diferencia_x13,coincide_x13_protocolo
+biodiesel,x13_bcr,holdout,2026-08,log,103922.605358085,146603.63,53.208913869947764,3.047256818027651,28.28399843648539,-25.23674161845774,25.23674161845774,1,103922.605358085,103922.605358085,0.0,True
+bioetanol_total,x13_bcr,holdout,2026-08,nivel,140393.718159332,139521.0,296.43838884189927,2.303722131840414,1.8038913823278362,0.499830749512578,0.499830749512578,1,140393.718159332,140393.718159332,0.0,True

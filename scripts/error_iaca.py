@@ -1,5 +1,5 @@
 
-"""SCRUM-42: error de la variación IACA para X-13 BCR y modelo final.
+"""SCRUM-42: error de la variación IACA para X-13 BCR y cualquier modelo del protocolo.
 
 Calcula la variación mensual del IACA usando los componentes de X-13.
 Las corridas se hacen con datos anteriores al mes pronosticado.

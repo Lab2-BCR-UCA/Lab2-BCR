@@ -43,6 +43,16 @@ ajustes estacionales estimados antes del mes evaluado.
 Por lo tanto, no representa necesariamente una publicación
 posterior de la BCR con ajustes revisados.
 
+Limitaciones:
+
+- El acierto del signo es frágil cuando la variación real
+  está cerca de cero: un cambio chico en los componentes de
+  X-13 puede darlo vuelta (ver mayo de 2025, sección 6).
+- El factor de la base 2013 multiplica a los dos índices y se
+  cancela en la variación logarítmica: afecta el nivel del
+  índice, no la métrica. Por eso la validación puede usar el
+  factor del Excel y el backtest el calculado con los datos.
+
 ## 4. Validación — Agosto de 2026
 
 Se utilizaron datos hasta julio de 2026.
@@ -81,33 +91,43 @@ para cada serie.
 | Métrica | Biodiésel | Bioetanol total |
 |---|---:|---:|
 | Meses | 48 | 48 |
-| Error medio absoluto (pp) | 19,3364 | 5,0948 |
-| Error medio con signo (pp) | +10,8554 | -0,1391 |
-| Aciertos del signo | 30 | 31 |
-| Acierto del signo (%) | 62,50 | 64,58 |
+| Error medio absoluto (pp) | 19,3364 | 5,1024 |
+| Error medio con signo (pp) | +10,8554 | -0,1466 |
+| Aciertos del signo | 30 | 30 |
+| Acierto del signo (%) | 62,50 | 62,50 |
 
-Resultados provisionales, sujetos a la revisión indicada
-en la siguiente sección.
+Los 96 pronósticos de X-13 coinciden con los de
+`results/protocolo_predicciones.csv` (ver la sección 6).
 
-## 6. Discrepancia detectada
+## 6. Discrepancia de mayo de 2025 (resuelta)
 
-En mayo de 2025, para bioetanol total:
+En la primera corrida, mayo de 2025 de bioetanol total dio
+un pronóstico distinto al del protocolo:
 
 - Pronóstico del protocolo: 95.105,69 m³.
-- Pronóstico X-13 recalculado: 95.764,48 m³.
+- Pronóstico recalculado en la primera corrida: 95.764,48 m³.
 - Diferencia: 658,79 m³.
 
-La corrida fue reproducible y no devolvió errores de X-13.
+Al volver a correr el backtest completo en otra máquina
+(Linux, mismo `x13binary` 1.1.61), los 96 pronósticos
+coinciden con el protocolo, incluido mayo de 2025, y no hay
+discrepancias. La diferencia sale de la máquina donde corre
+X-13, no del cálculo del índice: con los mismos datos y la
+misma versión, X-13 puede dar un resultado distinto en algún
+mes según la plataforma. Es consistente con lo que pasó al
+correr el protocolo largo en Windows (SCRUM-63), donde el MAE
+del X-13 de bioetanol total cambió unos 14 m³, lo que equivale
+a una diferencia de ese orden en un solo mes.
 
-Para mantener la coherencia entre el pronóstico y los
-componentes utilizados, el cálculo del IACA utiliza el
-pronóstico recalculado y registra la diferencia.
+Los resultados de `results/` son los que coinciden con el
+protocolo. En mayo de 2025 cambia también la variación con el
+dato real (+0,21 % en lugar de −0,02 %), porque sale de los
+mismos componentes, y el signo deja de acertarse.
 
-No se modificó el CSV original del protocolo.
-
-La causa de la discrepancia sigue pendiente de investigación.
-Las métricas del backtest deben considerarse provisionales
-hasta resolverla.
+El script sigue usando el pronóstico de la misma corrida que
+genera los componentes y registra en
+`iaca_*_discrepancias.csv` cualquier diferencia con el
+protocolo, para detectar si vuelve a pasar.
 
 ## 7. Caché
 
@@ -131,6 +151,7 @@ El archivo SQLite es local y no se versiona.
 - results/validacion_iaca_agosto_2026.csv
 - results/iaca_2026-08_detalle.csv
 - results/iaca_2026-08_metricas.csv
+- results/iaca_2026-08_discrepancias.csv
 - results/iaca_backtest_detalle.csv
 - results/iaca_backtest_metricas.csv
 - results/iaca_backtest_discrepancias.csv
@@ -151,14 +172,16 @@ Evaluar el backtest completo:
 
     python scripts/error_iaca.py
 
-Incorporar el modelo final:
+Evaluar otro modelo del protocolo:
 
     python scripts/error_iaca.py --modelo-final NOMBRE_MODELO
 
+El modelo tiene que tener sus predicciones en
+`results/protocolo_predicciones.csv`.
+
 ## 10. Pendientes
 
-- Investigar la discrepancia de mayo de 2025.
-- Incorporar las predicciones del modelo final seleccionado
-  por el equipo en el SCRUM-34.
-- Comparar sus métricas del IACA contra X-13 BCR.
-- Revisar los resultados antes de cerrar el SCRUM-42.
+No quedan pendientes dentro de SCRUM-42. La métrica del modelo
+final se calcula en SCRUM-34, que tiene que dejar sus
+predicciones en `results/protocolo_predicciones.csv`: hoy la
+suma contable y el elastic net las guardan en archivos propios.
