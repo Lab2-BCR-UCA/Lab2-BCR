@@ -20,3 +20,7 @@ data/cache_x13.db
 # Exportación del registro de estimaciones (se genera desde data/registro_estimaciones.csv)
 results/registro_estimaciones.xlsx
 data/registro_estimaciones.tmp
+
+# Simulaciones del pipeline (SCRUM-38): son para probar o mostrar.
+results/simulacion/
+data/registro_contribuciones.tmp

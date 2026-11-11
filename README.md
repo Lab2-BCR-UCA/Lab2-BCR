@@ -211,6 +211,18 @@ para la ventana corta: lo genera `scripts/baselines.py` y lo consumen
 mantiene su propio resumen por modelo **y ventana** en
 `results/protocolo_metricas.csv` (no es un duplicado).
 
+## Estimación mensual (SCRUM-38)
+
+Un comando descarga los datos, arma la base, estima el mes siguiente al último
+dato con el modelo final, explica la estimación y la guarda en el registro
+junto con sus contribuciones. Detalle en [`docs/pipeline.md`](docs/pipeline.md).
+
+```bash
+python scripts/pipeline.py                    # corrida mensual
+python scripts/pipeline.py --simular 2026-09  # demo con un mes ya publicado (no toca el registro)
+python scripts/test_pipeline.py               # pruebas (~2 min, corre X-13)
+```
+
 ## Registro de estimaciones (SCRUM-44)
 
 Cada estimación mensual se guarda en `data/registro_estimaciones.csv` (solo se
@@ -256,11 +268,12 @@ python scripts/prueba_registro_holdout.py   # simula el holdout y compara con SC
 - [x] **Modelo final** — Comparación y elección (SCRUM-34) y error sobre la
   variación del IACA (SCRUM-42).
 - [x] **Informe, parte 1** — Contexto y método (SCRUM-36), en `docs/informe/`.
-- [ ] **Explicación por contribuciones** (SCRUM-35) — en revisión.
-- [ ] **Entrega** — Pipeline (SCRUM-38), registro de estimaciones (SCRUM-44),
-  informe parte 2 (SCRUM-61) y presentación final (SCRUM-37).
+- [x] **Explicación y registro** — Contribuciones (SCRUM-35) y registro de
+  estimaciones (SCRUM-44).
+- [ ] **Entrega** — Pipeline (SCRUM-38, falta probarlo en Windows), informe
+  parte 2 (SCRUM-61) y presentación final (SCRUM-37).
 
-Estado del backlog consultado el **10/11/2026**. Los datos y métricas
+Estado del backlog consultado el **11/11/2026**. Los datos y métricas
 versionados no prueban por sí solos la finalización de los tickets pendientes.
 
 ## Equipo

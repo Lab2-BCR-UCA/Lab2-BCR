@@ -1,0 +1,13 @@
+# Dependencias del proyecto.
+# Versiones mínimas orientativas: lo probado (versiones exactas) está en docs/pipeline.md.
+pandas>=2.2
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+statsmodels>=0.14
+matplotlib>=3.8
+openpyxl>=3.1
+xlrd>=2.0
+requests>=2.31
+beautifulsoup4>=4.12
+x13binary>=1.1.61
