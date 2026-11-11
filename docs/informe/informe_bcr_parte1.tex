@@ -1,0 +1,658 @@
+% Informe final BCR - Parte 1: contexto y método (SCRUM-36)
+% Compila con pdfLaTeX (Overleaf incluido). Solo necesita los dos logos:
+% los datos de los gráficos están dentro de este mismo archivo.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-noshorthands,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[section]{placeins}
+\usepackage{needspace}
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.6}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.8}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots}
+\usetikzlibrary{babel}
+\pgfplotsset{compat=1.17}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{serie}{HTML}{2F6DB5}
+\definecolor{gris}{HTML}{8C8C84}
+\definecolor{grisclaro}{HTML}{E9E9E6}
+\definecolor{sube}{HTML}{7FBF7F}
+\definecolor{baja}{HTML}{DC8C8C}
+\definecolor{bandaazul}{HTML}{DCE8F5}
+
+\captionsetup{font=small,labelfont=bf}
+\setlist{itemsep=2pt,topsep=4pt}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\fuente}[1]{\par\vspace{2pt}{\footnotesize\color{black!65}Fuente: #1\par}}
+
+% Logos: subir logo_uca.png y logo_bcr.png junto a este archivo.
+% Si falta alguno, en su lugar aparece un recuadro y el archivo compila igual.
+\newcommand{\logo}[2][2.5cm]{\IfFileExists{#2}{\includegraphics[height=#1,keepaspectratio]{#2}}{\fbox{\parbox[c][3cm][c]{3cm}{\centering\footnotesize Falta\\ \texttt{\detokenize{#2}}}}}}
+
+\begin{document}
+\begin{titlepage}
+\centering
+\raisebox{-.5\height}{\logo[2.5cm]{logo_uca.png}}\hspace{3cm}\raisebox{-.5\height}{\logo[3.2cm]{logo_bcr.png}}
+
+\vspace{3.5cm}
+{\LARGE\bfseries Predicción de la producción de biocombustibles para el IACA\par}
+\vspace{0.8cm}
+{\large Informe final. Parte 1: contexto y método\par}
+
+\vspace{2.5cm}
+{\large
+Juan Cruz Chocobares\par
+Victoria Ortiz\par
+Agustín Formenti\par
+Andrés Morenico\par
+María Florencia Romero\par}
+
+\vfill
+Laboratorio de Consultoría de Datos 2\par
+Universidad Católica Argentina, sede Rosario\par
+En colaboración con la Bolsa de Comercio de Rosario\par
+\vspace{0.6cm}
+Noviembre de 2026\par
+\end{titlepage}
+
+\tableofcontents
+\thispagestyle{empty}
+\clearpage
+\setcounter{page}{1}
+
+\section{Contexto y pedido de la BCR}
+
+La BCR pidió poder explicar por qué varía la producción de biocombustibles, más que ganar precisión en el número del índice. Por eso este trabajo busca el modelo más explicable que no pierda precisión contra el que usa hoy la BCR.
+
+El Índice de Actividad de la Cadena Agropecuaria (IACA) resume cada mes 12 series de producción, faena, molienda y exportaciones. Dos de ellas, la producción de biodiésel y la de bioetanol, tienen un problema de calendario: la Secretaría de Energía las publica unos dos meses después. Cuando la BCR estima un mes, a fines del mes siguiente, solo conoce la producción hasta el mes anterior al estimado.
+
+Para cubrir ese hueco, la BCR estima el último mes con X-13ARIMA-SEATS, usando solo la historia de cada serie. Ese método tiene dos límites para este uso:
+
+\begin{itemize}
+  \item \textbf{No ve los saltos.} Para agosto 2026 estimó 103.923~tn de biodiésel, cerca de julio (101.097~tn). El dato de la Secretaría fue 146.604~tn, un 45\% más que julio.
+  \item \textbf{No explica.} El pronóstico sale de la historia de la serie, así que no dice qué factor económico lo empuja.
+\end{itemize}
+
+En la reunión del 20/10/2026, la BCR definió tres condiciones para el trabajo:
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{2.8cm}LL@{}}
+\toprule
+\textbf{Tema} & \textbf{Definición de la BCR} & \textbf{Consecuencia}\\
+\midrule
+Prioridad & Explicar por qué cambia la producción pesa más que el número del índice y que pequeñas diferencias de precisión & Modelos interpretables y tabla de contribuciones por factor\\
+Entregable & Un valor puntual, no un rango & El número es el resultado; los intervalos quedan como apoyo interno\\
+Fecha de estimación & Sin día de cierre fijo: puede esperar a que salgan los datos & Se pueden usar variables que salen antes de la estimación\\
+\bottomrule
+\end{tabularx}
+\caption{Condiciones definidas por la BCR.}
+\end{table}
+
+El alcance es predecir la \textbf{producción mensual}, no el precio: biodiésel en toneladas y bioetanol total, de maíz y de caña en m³. Hay que explicar el motivo de cada estimación, pero no todo el funcionamiento del sector. Como la BCR debe repetirlo todos los meses, el proceso corre con Python y una base de datos local en archivo.
+
+\section{Datos y fuentes}
+
+Todos los datos son públicos y oficiales, y los modelos solo usan lo que la BCR tendría al momento de estimar. Los datos de producción llegan a septiembre 2026. Cada serie se guarda en una base SQLite local con sus versiones: una descarga nueva agrega datos, sin pisar los anteriores.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=0.19cm,y=0.72cm,font=\small]
+  % día de estimación de la BCR
+  \fill[bandaazul] (22,-0.45) rectangle (31,-6.05);
+  \node[font=\footnotesize\bfseries,above] at (26.5,-0.45) {La BCR estima, sin día fijo};
+  \foreach \d in {0,10,20,30,40}{
+    \draw[black!15] (\d,-0.45) -- (\d,-6.05);
+    \node[font=\footnotesize,text=black!65,below] at (\d,-6.05) {\d};
+  }
+  \foreach \i in {1,...,6}{\draw[black!12] (0,-\i+0.25) -- (40,-\i+0.25);}
+  \node[left] at (-1,-0.75) {Dólar, pizarra, precios regulados};
+  \node[left] at (-1,-1.75) {Aceite y azúcar (Banco Mundial)};
+  \node[left,font=\small\bfseries] at (-1,-2.75) {Exportaciones (INDEC)};
+  \node[left] at (-1,-3.75) {Molienda de soja (SAGyP)};
+  \node[left] at (-1,-4.75) {Ventas de gasoil y nafta};
+  \node[left] at (-1,-5.75) {Producción (Sec. de Energía)};
+  \fill[gris] (0,-0.75) circle (3.2pt);
+  \node[right,font=\footnotesize,text=black!70,fill=white,inner sep=1.5pt] at (1,-0.75) {cierre del mes};
+  \draw[gris,line width=5pt,line cap=round] (2,-1.75) -- (4,-1.75);
+  \node[right,font=\footnotesize,text=black!70,fill=white,inner sep=1.5pt] at (5,-1.75) {días 2 a 4};
+  \fill[serie] (20,-2.75) circle (3.6pt);
+  \node[left,font=\footnotesize\bfseries,fill=white,inner sep=1.5pt] at (19,-2.75) {día 20};
+  \draw[gris,line width=5pt,line cap=round] (22.5,-3.75) -- (27.5,-3.75);
+  \node[left,font=\footnotesize,text=black!70,fill=white,inner sep=1.5pt] at (21.5,-3.75) {días 22 a 28};
+  \draw[gris,line width=5pt,line cap=round] (25,-4.75) -- (27,-4.75);
+  \node[left,font=\footnotesize,text=black!70,fill=white,inner sep=1.5pt] at (21.5,-4.75) {días 25 a 27};
+  \draw[gris,line width=5pt,line cap=round] (33,-5.75) -- (37,-5.75);
+  \node[right,font=\footnotesize,text=black!70,fill=white,inner sep=1.5pt] at (38,-5.75) {a los dos meses};
+\end{tikzpicture}
+\caption{Las exportaciones de INDEC llegan antes de estimar; la producción, después. Cuándo se conoce el dato de un mes, en días desde su cierre (fechas aproximadas).}
+\fuente{documentación del proyecto y reunión con la BCR del 20/10/2026.}
+\end{figure}
+
+El calendario decide qué variable sirve. Una variable del mes que se estima se usa sin rezago solo si la BCR ya la tiene en ese momento. Las que salen del archivo de producción de la Secretaría entran con un mes de rezago.
+
+\begin{table}[htbp]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}P{3.4cm}ccL@{}}
+\toprule
+\textbf{Dato} & \textbf{Fuente} & \textbf{Desde} & \textbf{Rezago} & \textbf{Para qué se usa}\\
+\midrule
+Producción de biodiésel y ventas & Secretaría de Energía & 2008 & 1 & Serie a predecir; ventas al corte y otras ventas\\
+Producción de bioetanol y ventas, por maíz y caña & Secretaría de Energía & 2009 & 1 & Series a predecir\\
+Exportaciones de biodiésel & INDEC (NCM 38260000) & 2012 & 0 & Principal factor de variación del biodiésel\\
+Ventas de gasoil y nafta & Secretaría de Energía (SESCO) & 2010 & 0 & Volumen sobre el que se aplica el corte\\
+Corte obligatorio nominal & Normas publicadas & 2010 & 0 & Porcentaje que exige la norma\\
+Corte efectivo & Calculado: ventas al corte / ventas de combustible & 2010 & 1 & Porcentaje que realmente se mezcló\\
+Molienda de soja & SAGyP & 2015 & 0 & Actividad de la industria aceitera\\
+Aceite de soja y azúcar & Banco Mundial & 1960 & 0 & Costo del biodiésel; reparto de la caña entre azúcar y alcohol\\
+Precios regulados & Secretaría de Energía & 2018 & 0 & Insumo de los márgenes\\
+Tipo de cambio y pizarra de soja y maíz & BCRA y Cámara Arbitral de Cereales & 2018 & 0 & Insumo de los márgenes\\
+\bottomrule
+\end{tabularx}
+\caption{Series utilizadas.}
+\end{table}
+
+El \textbf{rezago} indica cuántos meses hacia atrás está el último dato disponible: 0 es el mismo mes que se estima y 1, el mes anterior.
+
+\subsection{Exportaciones de INDEC}
+
+INDEC resuelve el problema de calendario: publica las exportaciones cerca del día 20 del mes siguiente, mientras que la Secretaría las informa recién junto con la producción. Las dos fuentes coinciden en si hubo exportación en 175 de 176 meses, con una correlación de 0,996 en las toneladas (157 meses con monto visible). Las diferencias grandes son barcos que cada fuente anotó en meses vecinos.
+
+\subsection{Limitaciones}
+
+\begin{itemize}
+  \item \textbf{Secreto estadístico.} INDEC oculta el monto en 19 meses, 12 de ellos dentro del backtest. Si el mes estimado viene oculto, se completa con la mediana de los meses ocultos anteriores, usando solo datos de meses previos.
+  \item \textbf{Descarga manual.} El CSV de INDEC se baja a mano cada mes, porque el sistema no tiene un acceso automático documentado.
+  \item \textbf{Datos revisados.} El backtest usa los valores actuales, no los publicados en cada momento, así que puede resultar algo optimista. Reconstruir las versiones históricas es muy costoso para la BCR y mezcla información confidencial; desde ahora cada descarga queda guardada.
+  \item \textbf{Datos reales contra estimados.} Si una fuente se atrasa, la BCR usa una estimación propia. El backtest usa siempre el dato real.
+  \item \textbf{Producción provisoria.} Los últimos 12 meses siempre figuran como provisorios, y sus valores pueden cambiar.
+  \item \textbf{Azúcar.} Es el precio internacional, y los ingenios venden sobre todo en el mercado interno. Es una aproximación.
+  \item \textbf{Precios regulados con huecos.} Biodiésel tiene 28 meses sin dato y bioetanol, 41. En los cálculos de margen se arrastra el último precio, porque rige hasta la resolución siguiente.
+\end{itemize}
+
+\section{Análisis exploratorio}
+
+Las cuatro series están completas, pero se comportan distinto: el biodiésel se mueve a saltos, la caña sigue la zafra y el maíz es casi plano durante el año. Por eso cada serie lleva su propio tratamiento. No hay meses faltantes, nulos ni fechas duplicadas dentro del rango de cada serie.
+
+\pgfplotstableread{
+i b e
+0 158.5 22.1
+1 113.7 18.9
+2 117.7 27.1
+3 160.3 31.8
+4 120.7 31.8
+5 144.8 40.8
+6 191.0 50.6
+7 193.3 61.9
+8 224.6 49.4
+9 245.4 50.1
+10 218.0 47.5
+11 109.7 40.4
+12 140.5 42.4
+13 132.6 39.0
+14 121.2 41.8
+15 142.5 48.8
+16 229.3 52.7
+17 250.0 61.0
+18 275.1 59.7
+19 278.3 62.9
+20 295.4 59.6
+21 308.9 72.2
+22 243.5 71.4
+23 167.1 59.5
+24 134.4 53.8
+25 99.1 51.6
+26 96.7 64.6
+27 128.4 60.2
+28 131.2 54.6
+29 190.4 74.5
+30 176.8 78.9
+31 208.5 72.6
+32 182.9 73.1
+33 199.7 86.1
+34 182.8 73.4
+35 79.8 72.0
+36 102.7 66.6
+37 151.1 65.0
+38 146.1 65.0
+39 191.4 60.7
+40 251.5 62.7
+41 261.8 60.7
+42 248.6 71.7
+43 285.4 87.7
+44 292.5 92.2
+45 294.2 84.9
+46 280.9 87.0
+47 153.1 85.7
+48 189.8 84.3
+49 162.2 80.1
+50 172.2 82.8
+51 249.4 80.6
+52 296.8 84.3
+53 282.7 93.0
+54 273.0 97.3
+55 169.9 104.6
+56 214.0 102.8
+57 293.1 111.3
+58 302.6 96.6
+59 265.7 87.5
+60 244.1 83.7
+61 157.0 80.9
+62 177.9 67.5
+63 226.4 75.1
+64 290.4 87.9
+65 265.4 106.7
+66 260.1 107.3
+67 134.8 107.3
+68 174.1 106.0
+69 132.5 103.2
+70 259.6 98.5
+71 106.6 89.6
+72 83.5 70.3
+73 93.1 68.4
+74 198.8 76.8
+75 275.0 67.2
+76 273.2 85.2
+77 176.8 94.8
+78 135.8 96.4
+79 203.0 111.2
+80 208.5 109.8
+81 172.3 103.2
+82 163.0 103.7
+83 164.3 86.4
+84 105.1 76.8
+85 189.7 70.2
+86 173.8 68.6
+87 44.8 15.9
+88 78.7 26.1
+89 133.1 67.4
+90 169.8 84.8
+91 106.8 77.8
+92 105.9 80.8
+93 12.3 69.4
+94 28.3 88.8
+95 9.1 82.0
+96 28.1 61.0
+97 164.4 67.1
+98 126.5 79.9
+99 84.8 68.8
+100 188.1 60.0
+101 170.4 74.1
+102 218.2 98.5
+103 182.5 102.1
+104 170.6 106.1
+105 147.6 101.2
+106 99.9 101.8
+107 142.5 87.4
+108 189.2 79.1
+109 177.4 75.3
+110 173.3 67.3
+111 201.3 67.6
+112 169.6 84.2
+113 186.7 108.8
+114 120.1 114.0
+115 114.3 118.5
+116 114.0 119.6
+117 200.4 125.2
+118 164.6 104.5
+119 98.8 94.7
+120 60.6 95.2
+121 44.6 79.5
+122 100.4 79.0
+123 98.0 81.7
+124 85.6 81.2
+125 63.5 86.7
+126 86.3 110.8
+127 92.2 111.2
+128 89.4 105.9
+129 57.8 108.7
+130 31.2 108.1
+131 21.6 108.7
+132 69.9 103.0
+133 60.8 72.5
+134 100.5 77.7
+135 121.7 73.5
+136 109.7 95.4
+137 123.5 117.0
+138 158.4 121.5
+139 107.0 123.2
+140 71.4 118.7
+141 78.9 113.4
+142 77.2 93.8
+143 83.7 97.9
+144 66.5 99.4
+145 64.1 89.7
+146 69.6 94.7
+147 65.7 88.2
+148 74.7 100.4
+149 105.3 113.7
+150 107.7 128.4
+151 95.5 137.4
+152 101.3 116.9
+153 81.5 113.0
+154 65.4 115.1
+155 74.9 97.9
+156 90.1 95.9
+157 67.3 99.5
+158 67.9 100.8
+159 83.2 80.0
+160 93.1 102.4
+161 118.6 113.2
+162 101.1 136.9
+163 146.6 139.5
+164 144.3 130.3
+}\produccion
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=1 by 2,vertical sep=1.5cm},
+  width=\textwidth,height=5.2cm,xmin=0,xmax=164,ymin=0,
+  xtick={0,24,48,72,96,120,144},
+  xticklabels={2013,2015,2017,2019,2021,2023,2025},
+  tick style={draw=none},
+  ymajorgrids,grid style={black!12},axis lines=left,axis line style={black!35},
+  every tick label/.append style={font=\footnotesize,text=black!65},
+  title style={font=\small\bfseries,align=left,anchor=west,at={(0,1.13)}},
+  clip=false]
+\nextgroupplot[title={Biodiésel, miles de toneladas},ymax=340,ytick={0,100,200,300},xticklabels={}]
+  \fill[black!8] (axis cs:104,0) rectangle (axis cs:152,340);
+  \fill[black!4] (axis cs:152,0) rectangle (axis cs:164,340);
+  \addplot[serie,line width=0.9pt] table[x=i,y=b]{\produccion};
+  \node[font=\scriptsize\bfseries,text=black!60] at (axis cs:52,352) {Decisiones del análisis};
+  \node[font=\scriptsize\bfseries,text=black!60] at (axis cs:128,352) {Backtest};
+  \node[font=\scriptsize\bfseries,text=black!60] at (axis cs:158,352) {Holdout};
+  \fill[serie] (axis cs:95,9.1) circle (1.7pt);
+  \draw[gris] (axis cs:95,16) -- (axis cs:95,308);
+  \node[font=\scriptsize,above left,inner xsep=0pt] at (axis cs:102,304) {2020: corte casi nulo};
+  \fill[serie] (axis cs:131,21.6) circle (1.7pt);
+  \draw[gris] (axis cs:131,28) -- (axis cs:131,308);
+  \node[font=\scriptsize,above] at (axis cs:131,304) {2023: caen las exportaciones};
+\nextgroupplot[title={Bioetanol total, miles de m³},ymax=160,ytick={0,50,100,150}]
+  \fill[black!8] (axis cs:104,0) rectangle (axis cs:152,160);
+  \fill[black!4] (axis cs:152,0) rectangle (axis cs:164,160);
+  \addplot[serie,line width=0.9pt] table[x=i,y=e]{\produccion};
+  \fill[serie] (axis cs:87,15.9) circle (1.7pt);
+  \node[font=\scriptsize,right] at (axis cs:89,10) {Abril 2020: pandemia};
+\end{groupplot}
+\end{tikzpicture}
+\caption{El biodiésel cambia de nivel a saltos; el bioetanol crece con la zafra. Producción mensual, enero 2013 a septiembre 2026, con las ventanas del protocolo.}
+\fuente{Secretaría de Energía. Últimos 12 meses provisorios.}
+\end{figure}
+
+El análisis se separó en dos partes para no usar información del período de evaluación. La parte descriptiva mira toda la muestra. Toda decisión que alimenta al modelo usa solo datos hasta agosto 2021. El bioetanol se entrena desde 2013, y el de maíz desde septiembre 2012, para dejar afuera el arranque casi nulo de 2009 a 2012.
+
+\subsection{Propuesta por serie}
+
+\begin{table}[htbp]
+\centering\footnotesize
+\begin{tabularx}{\textwidth}{@{}P{2.3cm}P{2.5cm}P{2.6cm}P{2.7cm}L@{}}
+\toprule
+\textbf{Serie} & \textbf{Fuerza estacional, 2013-2019} & \textbf{Estacionariedad en log} & \textbf{Transformación propuesta} & \textbf{Meses atípicos}\\
+\midrule
+Biodiésel & 0,68 (fuerte) & Estacionaria & Log & 12/2008, 01/2009, 10 a 12/2020\\
+Bioetanol total & 0,67 (fuerte a moderada) & Contradictoria & Nivel & 04 y 05/2020\\
+Bioetanol de maíz & 0,22 (leve) & Contradictoria & Nivel & 04 y 05/2020\\
+Bioetanol de caña & 0,81 (fuerte) & Estacionaria & Log & 04/2020\\
+\bottomrule
+\end{tabularx}
+\caption{Conclusiones del análisis exploratorio por serie.}
+\end{table}
+
+La fuerza estacional va de 0 a 1: cuanto más alta, más repite la serie el mismo patrón cada año. La estacionariedad se leyó con dos pruebas que parten de hipótesis opuestas, ADF y KPSS. Cuando no coinciden, como en total y maíz, conviene trabajar con la variación mensual. Con esa variación, ADF indica estacionariedad en las cuatro series y KPSS no la rechaza, aunque en maíz queda en el límite ($p = 0{,}051$). Estas transformaciones son propuestas del análisis exploratorio: la que usa cada modelo se decide con el protocolo de la sección~\ref{sec:protocolo} y se informa en la parte~2.
+
+\subsection{Qué dejó el análisis para el modelado}
+
+\begin{itemize}
+  \item \textbf{Atípicos transitorios.} Son la crisis de fines de 2008 y el shock de 2020. No cambian el nivel de la serie de forma permanente.
+  \item \textbf{Quiebres por norma.} Los cambios de corte obligatorio explican saltos de nivel históricos. Entran desde la norma como variable de régimen, no detectados desde la serie.
+  \item \textbf{Noviembre 2025.} La producción cambia de nivel en ese mes, pero cae en el holdout. Se describe y no se usa para decidir nada.
+\end{itemize}
+
+\subsection{Variables externas}\label{sec:externas}
+
+Las candidatas se eligieron por mecanismo económico y disponibilidad a tiempo, no por significancia estadística. La correlación cruzada solo sugirió qué rezagos probar: se calculó con datos anteriores a septiembre 2021 y sobre variaciones sin tendencia ni estacionalidad. Con unos 100 meses tiene poca potencia, y descartar por ese número dejaría afuera variables con mecanismo real.
+
+\begin{itemize}
+  \item \textbf{Ventas de nafta.} Es la relación más fuerte con mecanismo claro: +0,85 con la caña y +0,47 con el maíz en el mismo mes.
+  \item \textbf{Biodiésel.} Ninguna variable interna supera 0,30 en valor absoluto. Es coherente con que sus saltos vienen de las exportaciones, que no se pudieron medir con esta correlación porque tienen muchos meses en cero.
+  \item \textbf{Corte efectivo.} Sus correlaciones altas son circulares, porque se calcula con las ventas al corte, que siguen a la producción del mismo mes. Entra con rezago 1 y se lee con esa advertencia.
+  \item \textbf{Azúcar y márgenes.} La correlación es débil, y se mantienen por su mecanismo económico.
+\end{itemize}
+
+Cuánto mejora cada variable se mide después con el protocolo de la sección~\ref{sec:protocolo}, no con estas correlaciones.
+
+\section{Qué mueve la producción}
+
+Las exportaciones mueven el biodiésel y la zafra de caña mueve el bioetanol en el corto plazo. La descomposición contable lo muestra sin estimar ningún modelo, y por eso guía la elección de variables.
+
+El biodiésel cumple una identidad: lo producido se vende en el país, se exporta o queda en stock. En bioetanol, el total es la suma de maíz y caña.
+
+\begin{equation*}
+\text{Producción} = \text{ventas al corte} + \text{otras ventas} + \text{exportaciones} + \Delta\,\text{stock}
+\end{equation*}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=2.35cm,y=0.028cm,font=\footnotesize]
+  % eje y: 1 unidad = 1.000 tn
+  \draw[black!35] (-0.1,0) -- (5.75,0);
+  \def\bw{0.72}
+  \fill[gris!55] (0,0) rectangle (\bw,101.097);
+  \fill[sube] (1,101.097) rectangle (1+\bw,163.273);
+  \fill[baja] (2,162.753) rectangle (2+\bw,163.273);
+  \fill[sube] (3,162.753) rectangle (3+\bw,163.089);
+  \fill[baja] (4,146.604) rectangle (4+\bw,163.089);
+  \fill[gris!55] (5,0) rectangle (5+\bw,146.604);
+  \draw[black!35,dashed] (\bw,101.097) -- (1,101.097);
+  \draw[black!35,dashed] (1+\bw,163.273) -- (2,163.273);
+  \draw[black!35,dashed] (2+\bw,162.753) -- (3,162.753);
+  \draw[black!35,dashed] (3+\bw,163.089) -- (4,163.089);
+  \draw[black!35,dashed] (4+\bw,146.604) -- (5,146.604);
+  \node[above,font=\footnotesize\bfseries] at (0.36,101.097) {101.097};
+  \node[above,font=\footnotesize\bfseries] at (1.36,163.273) {+62.176};
+  \node[above,font=\footnotesize\bfseries] at (2.36,163.273) {$-$520};
+  \node[above,font=\footnotesize\bfseries] at (3.36,163.089) {+336};
+  \node[above,font=\footnotesize\bfseries] at (4.36,163.089) {$-$16.485};
+  \node[above,font=\footnotesize\bfseries] at (5.36,146.604) {146.604};
+  \node[below,text=black!65] at (0.36,0) {Julio};
+  \node[below,text=black!65] at (1.36,0) {Exportaciones};
+  \node[below,text=black!65] at (2.36,0) {Ventas al corte};
+  \node[below,text=black!65] at (3.36,0) {Otras ventas};
+  \node[below,text=black!65] at (4.36,0) {Stock (resto)};
+  \node[below,text=black!65] at (5.36,0) {Agosto};
+\end{tikzpicture}
+\caption{Agosto 2026: las exportaciones subieron más que la producción. Biodiésel, de julio a agosto, en toneladas. Verde suma, rojo resta.}
+\fuente{Secretaría de Energía. Datos provisorios; stock calculado como resto.}
+\end{figure}
+
+En agosto 2026 la producción subió 45.507~tn (+45\%). Las exportaciones pasaron de 14.000 a 76.176~tn, mientras que las ventas internas casi no se movieron. La diferencia salió de stock. Es el mes que el X-13 subestimó en la sección~1: mirando solo la historia de la serie no se puede anticipar un embarque.
+
+\subsection{Cuánto explica cada componente}
+
+Para medirlo en todo el período se calculó qué parte de la variación de la producción acompaña cada componente. La cuenta es la covarianza entre el cambio del componente y el cambio de la producción, dividida por la varianza del cambio de la producción. Las partes suman 100\%.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+\textbf{Serie} & \textbf{Componente} & \textbf{Variación mensual} & \textbf{Variación interanual}\\
+\midrule
+Biodiésel & Exportaciones & 100\% & 88\%\\
+Biodiésel & Ventas al corte & 8\% & 12\%\\
+Biodiésel & Otras ventas & 1\% & 0\%\\
+Biodiésel & Stock (resto) & $-$9\% & 1\%\\
+\midrule
+Bioetanol & Caña & 74\% & 53\%\\
+Bioetanol & Maíz & 26\% & 47\%\\
+\bottomrule
+\end{tabular}
+\caption{Aporte de cada componente a la variación de la producción.}
+\end{table}
+
+Período: septiembre 2021 a agosto 2026 (60 meses), que incluye los meses del holdout; cifras redondeadas. Es una descripción, no una prueba de que un modelo mejore. El stock negativo indica que amortigua parte de los saltos de las exportaciones.
+
+Con datos de 2013 a agosto 2021, anteriores al backtest, las exportaciones ya dominaban el biodiésel: 89\% de la variación mensual y 85\% de la interanual. En bioetanol, la caña explicaba 63\% de la mensual y 44\% de la interanual. El peso exacto de cada componente cambia según el período, así que las variables no se eligieron por estos porcentajes sino por la identidad contable y el mecanismo económico.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=0.96\textwidth,height=5.6cm,xmin=0,xmax=11,ymin=0,ymax=70,
+  xtick={0,...,11},xticklabels={Ene,Feb,Mar,Abr,May,Jun,Jul,Ago,Sep,Oct,Nov,Dic},
+  ytick={0,20,40,60},tick style={draw=none},ymajorgrids,grid style={black!12},
+  axis lines=left,axis line style={black!35},
+  every tick label/.append style={font=\footnotesize,text=black!65},clip=false]
+  \fill[black!7] (axis cs:4,0) rectangle (axis cs:10,70);
+  \node[font=\scriptsize\bfseries,text=black!60] at (axis cs:7,5) {Zafra, mayo a noviembre};
+  \addplot[gris,line width=1.1pt] coordinates {(0,41.9)(1,45.0)(2,37.4)(3,32.2)(4,34.8)(5,40.4)(6,43.7)(7,44.0)(8,42.4)(9,43.4)(10,42.7)(11,42.1)};
+  \addplot[serie,line width=1.2pt,mark=*,mark size=1.4pt] coordinates {(0,30.8)(1,24.8)(2,21.2)(3,17.2)(4,27.3)(5,48.3)(6,56.1)(7,58.9)(8,54.1)(9,54.7)(10,47.1)(11,31.8)};
+  \node[font=\scriptsize\bfseries,above] at (axis cs:7,59) {Producción};
+  \node[font=\scriptsize,text=black!65,right] at (axis cs:11,42.1) {Ventas};
+\end{axis}
+\end{tikzpicture}
+\caption{La caña se produce en la zafra, pero se vende pareja todo el año. Bioetanol de caña, promedio por mes, septiembre 2021 a agosto 2026, en miles de m³.}
+\fuente{Secretaría de Energía. Promedios de 60 meses.}
+\end{figure}
+
+En bioetanol no sirve la misma cuenta, porque la producción no sigue a las ventas del mes. La caña se elabora en la zafra y se vende durante todo el año. Por eso la suma contable se aplica solo al biodiésel.
+
+\subsection{Variables candidatas y su motivo}
+
+Son candidatas elegidas por mecanismo económico y disponibilidad a tiempo. Cuáles se mantienen en cada modelo se decide con el protocolo de la sección~\ref{sec:protocolo} y se informa en la parte~2.
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.1cm}P{3.1cm}L@{}}
+\toprule
+\textbf{Serie} & \textbf{Qué la mueve} & \textbf{Variables}\\
+\midrule
+Biodiésel & Embarques al exterior & Exportaciones de INDEC del mes e indicador de mes oculto\\
+Biodiésel & Mezcla con gasoil & Demanda interna estimada: ventas de gasoil del mes por el corte efectivo del mes anterior\\
+Biodiésel & Rentabilidad & Margen doméstico: precio regulado contra el costo del aceite de soja\\
+Biodiésel & Actividad aceitera & Molienda de soja\\
+Bioetanol de caña & Zafra & Estacionalidad del mes\\
+Bioetanol de caña & Reparto de la caña & Precio internacional del azúcar\\
+Bioetanol de caña & Mezcla con nafta & Ventas de nafta\\
+Bioetanol de maíz & Mezcla con nafta & Ventas de nafta\\
+Bioetanol de maíz & Inercia & Corte efectivo del mes anterior: resume la mezcla reciente, no es una causa (ver sección~\ref{sec:externas})\\
+Bioetanol de maíz & Rentabilidad & Margen: precio regulado contra el costo del maíz\\
+\bottomrule
+\end{tabularx}
+\caption{Variables candidatas por serie.}
+\end{table}
+
+El corte nominal entra solo como variable de régimen. La variación de stock queda sin explicar, porque no hay un dato público mensual que la mida.
+
+\section{Protocolo de evaluación y métricas}\label{sec:protocolo}
+
+Todos los modelos se comparan con las mismas reglas, sobre los mismos meses y simulando lo que la BCR sabría al estimar. La elección se hace en el backtest; el holdout solo confirma.
+
+\subsection{Ventanas}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{2cm}P{5.6cm}L@{}}
+\toprule
+\textbf{Ventana} & \textbf{Meses} & \textbf{Para qué se usa}\\
+\midrule
+Backtest & Septiembre 2021 a agosto 2025 (48) & Decidir variables, rezagos, ajustes y modelo final\\
+Holdout & Septiembre 2025 a septiembre 2026 (13) & Confirmar una sola vez, con el modelo ya elegido\\
+\bottomrule
+\end{tabularx}
+\caption{Ventanas de evaluación.}
+\end{table}
+
+Con solo 12 meses no se podía distinguir ningún modelo, por eso se amplió el backtest a 48. Septiembre 2026 se publicó después de fijar las ventanas, así que se sumó al holdout y el backtest quedó igual. De los 13 meses del holdout, 12 figuran como provisorios, porque sus datos todavía pueden revisarse.
+
+\subsection{Validación mes a mes}
+
+Cada modelo se evalúa con una validación walk-forward, que repite lo que pasaría en la práctica:
+
+\begin{enumerate}
+  \item Se entrena con los datos hasta el mes anterior al que se predice.
+  \item Se predice un solo mes, en toneladas o m³.
+  \item Se guarda el error contra el dato real.
+  \item Se suma ese mes al entrenamiento y se pasa al siguiente.
+\end{enumerate}
+
+\subsection{Reglas para no usar información del futuro}
+
+\begin{itemize}
+  \item \textbf{Decisiones dentro de cada iteración.} Toda decisión que alimenta al modelo se toma con datos hasta el mes anterior al que se predice: selección de variables, estandarización, hiperparámetros y tratamiento de atípicos.
+  \item \textbf{Rezagos según el calendario.} Cada variable entra con el rezago mínimo de la sección~2.
+  \item \textbf{Eventos.} Un evento anormal solo puede excluir meses del entrenamiento si terminó antes del mes que se predice. Cada modelo decide si le conviene usar esa exclusión.
+  \item \textbf{Features comunes.} Todos los modelos usan el mismo constructor de variables, con pruebas que controlan que ningún dato llegue antes de tiempo.
+\end{itemize}
+
+\subsection{Métricas}
+
+\begin{table}[htbp]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}P{3.1cm}LP{3.6cm}@{}}
+\toprule
+\textbf{Métrica} & \textbf{Qué mide} & \textbf{Rol}\\
+\midrule
+MAE & Error absoluto promedio, en toneladas o m³ & Principal\\
+Variación del IACA & Diferencia entre la variación con el pronóstico y con el dato real & Para el X-13 y el modelo final\\
+Acierto de signo & Porcentaje de meses en que se acierta si la producción original sube o baja & Diagnóstico\\
+MAPE & Error absoluto promedio en porcentaje & Referencia\\
+RMSE & Error que penaliza más los desvíos grandes & Referencia\\
+\bottomrule
+\end{tabularx}
+\caption{Métricas de evaluación.}
+\end{table}
+
+El MAE es la métrica principal porque un mismo error en toneladas pesa mucho más, en porcentaje, en los meses de baja producción. Las métricas se calculan por serie, en unidades originales y con los errores por subperíodo.
+
+\subsection{Cómo se comparan los modelos}
+
+Un promedio más bajo no alcanza para decir que un modelo es mejor, porque 48 meses dejan bastante margen de azar. Por eso cada comparación usa la diferencia de error mes a mes, con dos medidas:
+
+\begin{itemize}
+  \item \textbf{Intervalo de confianza del 95\%} por bootstrap por bloques, que respeta que los errores de meses cercanos se parecen.
+  \item \textbf{Prueba de Diebold-Mariano}, que indica si la diferencia entre dos modelos puede atribuirse al azar.
+\end{itemize}
+
+Si el intervalo incluye el cero, la diferencia no es concluyente. Aun así puede pasar que ningún modelo le gane con claridad a los de referencia, y eso también es un resultado válido.
+
+\subsection{Modelos y regla de elección}
+
+La referencia son dos modelos simples, el naive (repite el mes anterior) y el naive estacional (repite el mismo mes del año anterior), y la réplica del X-13 con los archivos de configuración de la BCR. Esa réplica coincide con los 12 pronósticos de su Excel.
+
+Se elige el modelo más interpretable cuyo error no sea significativamente peor que el del mejor. El orden de interpretabilidad es suma contable, elastic net, SARIMAX y X-13. Esta regla refleja el pedido de la BCR: si dos modelos no se distinguen en error, conviene el que permite explicar el número.
+
+\needspace{10\baselineskip}
+\section*{Fuentes}
+\addcontentsline{toc}{section}{Fuentes}
+
+\begin{itemize}
+  \item Repositorio del proyecto: \url{https://github.com/Lab2-BCR-UCA/lab2-bcr}. Datos y documentación de la carpeta \texttt{docs/}, versión del 4/11/2026, más el archivo de la Secretaría de Energía con datos a septiembre 2026.
+  \item Bolsa de Comercio de Rosario, metodología del IACA: \url{https://www.bcr.com.ar/sites/default/files/2025-11/iaca_metodologia.pdf}.
+  \item INDEC, Sistema de Consulta de Comercio Exterior: \url{https://comex.indec.gob.ar}.
+  \item Respuestas de la BCR: mail del 9/10/2026 y reunión del 20/10/2026, registrados en \texttt{docs/respuestas\_bcr.md}.
+\end{itemize}
+
+\end{document}
