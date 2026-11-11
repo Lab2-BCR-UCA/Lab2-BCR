@@ -211,6 +211,22 @@ para la ventana corta: lo genera `scripts/baselines.py` y lo consumen
 mantiene su propio resumen por modelo **y ventana** en
 `results/protocolo_metricas.csv` (no es un duplicado).
 
+## Registro de estimaciones (SCRUM-44)
+
+Cada estimación mensual se guarda en `data/registro_estimaciones.csv` (solo se
+agregan filas) junto con la variación del IACA que se publicaría. Cuando se
+publica el dato real, se completan el real, el error en producción y el error
+en la variación (métrica de SCRUM-42). Detalle en
+[`docs/registro.md`](docs/registro.md).
+
+```bash
+python scripts/registro.py completar     # después de actualizar los datos
+python scripts/registro.py registrar --serie biodiesel --mes 2026-10 --modelo modelo_final --pronostico 123456.7
+python scripts/registro.py exportar      # results/registro_estimaciones.xlsx para la BCR
+python scripts/test_registro.py          # pruebas rápidas
+python scripts/prueba_registro_holdout.py   # simula el holdout y compara con SCRUM-42 (~6 min)
+```
+
 ## Notebooks
 
 - `notebooks/eda_produccion.ipynb` — análisis exploratorio del target, en dos
