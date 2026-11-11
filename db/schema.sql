@@ -81,20 +81,39 @@ CREATE TABLE observaciones (
 
 CREATE INDEX idx_obs_serie_fecha ON observaciones (serie_id, fecha);
 
--- Registro de estimaciones (SCRUM-44). Queda vacío hasta que el pipeline
--- (SCRUM-38) escriba en él. Solo se agregan filas.
+-- Registro de estimaciones (SCRUM-44). La fuente de verdad es
+-- data/registro_estimaciones.csv, que se versiona en el repo: build_db.py lo
+-- carga acá en cada armado y scripts/registro.py lo actualiza. Solo se
+-- agregan filas; las columnas del dato real se completan una sola vez.
+-- Las columnas de la variación del IACA solo se llenan en las series que
+-- entran al índice (biodiesel y bioetanol total).
 CREATE TABLE registro_estimaciones (
-    estimacion_id        INTEGER PRIMARY KEY,
-    fecha_corrida        TEXT NOT NULL,      -- YYYY-MM-DD
-    serie_id             TEXT NOT NULL REFERENCES series(serie_id),
-    mes_estimado         TEXT NOT NULL,      -- YYYY-MM-01
-    modelo               TEXT NOT NULL,
-    configuracion        TEXT,               -- JSON con parámetros del modelo
-    pronostico           REAL NOT NULL,
-    fecha_descarga_datos TEXT NOT NULL,      -- versión de los datos usada
-    valor_real           REAL,               -- se completa cuando se publica
-    error                REAL,               -- pronostico menos valor_real
-    fecha_real           TEXT,               -- fecha de la descarga que trajo el real
+    estimacion_id              INTEGER PRIMARY KEY,
+    fecha_corrida              TEXT NOT NULL,   -- YYYY-MM-DD HH:MM:SS
+    serie_id                   TEXT NOT NULL REFERENCES series(serie_id),
+    mes_estimado               TEXT NOT NULL,   -- YYYY-MM-01
+    modelo                     TEXT NOT NULL,
+    configuracion              TEXT,            -- JSON con parámetros del modelo
+    pronostico                 REAL NOT NULL,
+    fecha_descarga_datos       TEXT NOT NULL,   -- versión de la base usada (YYYY-MM-DD)
+    -- Variación que se publicaría en el IACA con este pronóstico, y los
+    -- componentes de X-13 con que se calculó (hacen falta para calcular
+    -- después la variación con el dato real sin volver a correr X-13).
+    variante_x13               TEXT CHECK (variante_x13 IN ('log', 'nivel')),
+    factor_base_2013           REAL,
+    x13_estacional             REAL,
+    x13_filtrado_penultimo     REAL,
+    x13_filtrado_ultimo        REAL,
+    indice_pronosticado        REAL,
+    variacion_pronosticada_pct REAL,
+    -- Se completan cuando la Secretaría de Energía publica el dato.
+    valor_real                 REAL,
+    real_provisorio            INTEGER CHECK (real_provisorio IN (0, 1)),
+    fecha_real                 TEXT,            -- descarga que trajo el real
+    error_produccion           REAL,            -- pronostico menos valor_real
+    variacion_con_real_pct     REAL,
+    error_variacion_pp         REAL,            -- variación pronosticada menos variación con el real
+    acierto_signo              INTEGER CHECK (acierto_signo IN (0, 1)),
     UNIQUE (serie_id, mes_estimado, modelo, fecha_corrida)
 );
 

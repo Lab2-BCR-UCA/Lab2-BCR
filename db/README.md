@@ -75,7 +75,7 @@ fuentes ──< series ──< observaciones >── descargas >── fuentes
 | `descargas` | versión cargada de una fuente | `descarga_id` | Fecha de descarga, archivo de la copia, hash, filas y origen (`commit`, `carga` o `derivada`). Las versiones de derivadas no tienen archivo y dicen de qué derivada son en `serie_derivada`. |
 | `descargas_insumos` | insumo usado por una versión de una derivada | `descarga_id` + `insumo_descarga_id` | Linaje: con qué descargas de los insumos se calculó cada versión. |
 | `observaciones` | serie, mes y versión | `serie_id` + `fecha` + `descarga_id` | El valor y, en producción, si era provisorio en esa versión. |
-| `registro_estimaciones` | estimación de un modelo | `estimacion_id` | Vacía por ahora. La completa el pipeline (SCRUM-38 y SCRUM-44): pronóstico, modelo, configuración, versión de los datos usada y, cuando se publica, el real y el error. |
+| `registro_estimaciones` | estimación de un modelo | `estimacion_id` | Copia de `data/registro_estimaciones.csv` (SCRUM-44), que es la fuente de verdad porque la base se rearma de cero: el armado la carga y `scripts/registro.py` la actualiza. Pronóstico, modelo, configuración, versión de los datos, variación del IACA que se publicaría y, cuando se publica, el real y los errores. Ver `docs/registro.md`. |
 
 Vistas:
 

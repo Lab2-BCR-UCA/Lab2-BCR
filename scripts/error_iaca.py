@@ -196,42 +196,16 @@ def _clave(
     )
 
 
-def obtener_contexto(
-    con: sqlite3.Connection,
-    nombre: str,
-    variante: str,
-    entrenamiento: pd.Series,
-) -> tuple[dict, bool]:
-    """Obtiene los componentes de X-13 desde la caché o los calcula."""
+def contexto_desde_salida(
+    salida: dict,
+    ultimo: pd.Period,
+    descripcion: str,
+) -> dict:
+    """Arma el contexto del IACA a partir de la salida de una corrida de X-13.
 
-    clave = _clave(
-        nombre, variante, entrenamiento
-    )
-
-    fila = con.execute(
-        "SELECT resultado "
-        "FROM iaca_componentes "
-        "WHERE serie=? "
-        "AND variante=? "
-        "AND datos_hasta=? "
-        "AND hash_datos=? "
-        "AND hash_config=?",
-        clave,
-    ).fetchone()
-
-    if fila:
-        return json.loads(fila[0]), True
-
-    # Si no está en caché, ejecuto X-13.
-    spc = SPC_BCR[nombre][
-        0 if variante == "log" else 1
-    ]
-
-    salida = _correr(
-        spec_desde_spc(
-            spc, entrenamiento
-        )
-    )
+    También lo usa el registro de estimaciones (SCRUM-44), para que el
+    cálculo del índice esté en un solo lugar.
+    """
 
     tablas = {
         k: _leer_tabla(salida.get(k))
@@ -246,10 +220,9 @@ def obtener_contexto(
     ):
         raise RuntimeError(
             f"X-13 no devolvió todos los componentes: "
-            f"{nombre}, {variante}."
+            f"{descripcion}."
         )
 
-    ultimo = entrenamiento.index[-1]
     penultimo = ultimo - 1
     proximo = ultimo + 1
 
@@ -287,6 +260,52 @@ def obtener_contexto(
             ultimo
         ),
     }
+
+    return resultado
+
+
+def obtener_contexto(
+    con: sqlite3.Connection,
+    nombre: str,
+    variante: str,
+    entrenamiento: pd.Series,
+) -> tuple[dict, bool]:
+    """Obtiene los componentes de X-13 desde la caché o los calcula."""
+
+    clave = _clave(
+        nombre, variante, entrenamiento
+    )
+
+    fila = con.execute(
+        "SELECT resultado "
+        "FROM iaca_componentes "
+        "WHERE serie=? "
+        "AND variante=? "
+        "AND datos_hasta=? "
+        "AND hash_datos=? "
+        "AND hash_config=?",
+        clave,
+    ).fetchone()
+
+    if fila:
+        return json.loads(fila[0]), True
+
+    # Si no está en caché, ejecuto X-13.
+    spc = SPC_BCR[nombre][
+        0 if variante == "log" else 1
+    ]
+
+    salida = _correr(
+        spec_desde_spc(
+            spc, entrenamiento
+        )
+    )
+
+    resultado = contexto_desde_salida(
+        salida,
+        entrenamiento.index[-1],
+        f"{nombre}, {variante}",
+    )
 
     # Guardo la corrida para reutilizarla.
     con.execute(
