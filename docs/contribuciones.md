@@ -3,8 +3,18 @@
 Código: `scripts/contribuciones.py`. Pruebas: `scripts/test_contribuciones.py`.
 
 Para cada mes estimado, la función `explicar(modelo, fecha)` devuelve qué
-factores empujan la estimación, en toneladas o m³ y en puntos de variación contra
-el mes anterior. Sirve para los modelos elegidos en SCRUM-34
+factores empujan la estimación, en toneladas o m³ (columna `aporte`) y en puntos
+de variación de la producción contra el mes anterior (columna
+`aporte_variacion_produccion_pp`).
+
+> **Los puntos no son los del IACA.** Son la variación de la producción tal
+> cual, sin desestacionalizar. El IACA mide la variación del índice
+> desestacionalizado y suavizado (`docs/error_iaca.md`), así que efectos como la
+> estacionalidad o la zafra ahí se sacan. Estos puntos no sirven para justificar
+> la variación del IACA. Los aportes en toneladas o m³ explican la producción
+> estimada, que es la entrada del índice.
+
+Sirve para los modelos elegidos en SCRUM-34
 (`docs/comparacion_final.md`): suma contable para biodiésel y elastic net para
 bioetanol maíz, caña y total. También admite el elastic net de biodiésel
 (`elastic_net_biodiesel_con_contables_sin_eventos`), aunque no quedó elegido.
@@ -36,7 +46,7 @@ Los aportes se agrupan en factores (`grupo_de`):
 
 | Factor | Variables |
 |---|---|
-| estacionalidad (en caña: "estacionalidad (zafra)") | dummies de mes y `lag_12` (el mismo mes del año anterior) |
+| estacionalidad ("estacionalidad (maíz)" y "estacionalidad (zafra)" en caña) | dummies de mes y `lag_12` (el mismo mes del año anterior) |
 | inercia | `lag_1`, `lag_2` y el corte efectivo (que resume la mezcla reciente, SCRUM-31) |
 | exportaciones | `expo_*` |
 | mercado interno | ventas de gasoil y nafta, demanda interna estimada, otras ventas, corte nominal y cotab |
@@ -47,9 +57,19 @@ Los aportes se agrupan en factores (`grupo_de`):
 Una variable que no está en la tabla hace frenar al script: así no se pierde
 un aporte si se agrega una variable nueva al modelo.
 
-### Puntos de variación
+### Exportaciones estimadas
 
-La variación estimada es contra el dato real del mes anterior:
+En 15 de los 61 meses evaluados (2021-09 a 2026-09) INDEC oculta la exportación
+de biodiésel por secreto estadístico y el valor se completa con la mediana de
+los meses ocultos anteriores (`construir_features.py`). En esos meses la columna
+`nota` de la fila exportaciones lo avisa y `attrs["exportaciones_estimadas"]` es
+verdadero. Por ejemplo, julio de 2026: el modelo usa 28.892 tn y la Secretaría
+informó después 14.000 tn. Bioetanol no usa exportaciones.
+
+### Puntos de variación de la producción
+
+La variación estimada de la producción (sin desestacionalizar) es contra el
+dato real del mes anterior:
 `100 × (predicción − real(t−1)) / real(t−1)`. Se reparte así:
 
 - **Suma contable.** Cada destino aporta su estimación de t menos su valor real
@@ -81,7 +101,7 @@ factor y que otras ventas no mueven la variación.
 Predicción 145.484 tn contra 101.097 tn reales de julio: **+43,9 %** estimado.
 El dato real fue 146.604 tn (+45,0 %).
 
-| Factor | Aporte (tn) | Puntos de variación |
+| Factor | Aporte (tn) | Puntos (producción) |
 |---|---:|---:|
 | mercado interno | 67.890 | −5,0 |
 | exportaciones | 76.176 | +61,5 |
@@ -99,7 +119,7 @@ vendió, algo que el modelo no repite.
 Predicción 60.156 tn contra 81.462 tn reales de octubre: **−26,2 %** estimado.
 El dato real fue 65.351 tn (−19,8 %).
 
-| Factor | Aporte (tn) | Puntos de variación |
+| Factor | Aporte (tn) | Puntos (producción) |
 |---|---:|---:|
 | mercado interno | 28.515 | −1,4 |
 | exportaciones | 31.500 | −35,0 |
@@ -119,7 +139,7 @@ limitación de la suma contable: depende de que el corte no cambie de golpe.
 Predicción 111.406 m³ contra 100.442 m³ reales de mayo: **+10,9 %** estimado.
 El dato real fue 113.706 m³ (+13,2 %).
 
-| Factor | Aporte (m³) | Puntos de variación |
+| Factor | Aporte (m³) | Puntos (producción) |
 |---|---:|---:|
 | estacionalidad (maíz) | 3.560 | −0,1 |
 | mercado interno | 2.950 | −1,6 |
@@ -133,15 +153,31 @@ El dato real fue 113.706 m³ (+13,2 %).
 
 El factor principal es la zafra: la caña pasó de 31.776 m³ en mayo a 55.713 m³
 en junio, mientras el maíz bajó de 68.666 a 57.993 m³. El modelo capta el
-arranque de la zafra por la estacionalidad de caña.
+arranque de la zafra por la estacionalidad de caña. Esto explica la producción;
+en el IACA, que está desestacionalizado, ese efecto de la zafra se saca.
 
 ## 3. Limitaciones
 
-- **Puntos de variación en el elastic net.** Cuando el mes anterior fue atípico,
-  la fila "ajuste del mes anterior" domina y los demás factores se leen mal.
-  Ejemplo: caña en mayo de 2026 da +65,7 % estimado, con +114,4 puntos de
-  ajuste del mes anterior y −66,7 de inercia. En esos casos conviene leer la
-  descomposición en nivel (toneladas o m³), no la de puntos.
+- **Lo que viene del mes anterior pesa mucho en los puntos.** La fila
+  "variación de stock del mes anterior" (suma contable) o "ajuste del mes
+  anterior" (elastic net) es, en valor absoluto, más grande que toda la
+  variación estimada en cerca de la mitad de los meses (2021-09 a 2026-09,
+  61 meses):
+
+  | Modelo | Meses en que esa fila supera a la variación |
+  |---|---:|
+  | Biodiésel, suma contable | 46 % |
+  | Bioetanol maíz | 62 % |
+  | Bioetanol caña | 51 % |
+  | Bioetanol total | 52 % |
+
+  No es algo de meses raros: es lo habitual. Por eso, para el informe y para
+  la BCR, la explicación se hace con los aportes en toneladas o m³; los puntos
+  sirven como complemento. Ejemplo: caña en mayo de 2026 da +65,7 %
+  estimado, con +114,4 puntos de ajuste del mes anterior y −66,7 de inercia.
+- **No es la variación del IACA.** Pasar cada aporte al índice se puede (el
+  índice estimado es una cuenta lineal de la producción), pero queda para otra
+  tarea.
 - **Aportes contra la media.** En el elastic net cada aporte es relativo a la
   media del entrenamiento: un aporte negativo significa "por debajo de lo
   normal", no que la variable reste producción en términos absolutos.
@@ -149,4 +185,5 @@ arranque de la zafra por la estacionalidad de caña.
   ejemplo, los rezagos y la estacionalidad) y el elastic net reparte el efecto
   entre ellas. Los aportes describen cómo llega el modelo a su número.
 - **Integración.** La función todavía no está en el flujo de entrega ni guarda
-  un registro mensual: eso queda para los tickets de pipeline y de registro.
+  un registro mensual. Ese criterio pasó a los tickets de pipeline y de registro,
+  que dependen de esta función.

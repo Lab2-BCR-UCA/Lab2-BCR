@@ -41,7 +41,7 @@ def test_reconstruye_prediccion_del_protocolo():
             guardada = _guardada(modelo, mes)
             assert np.isclose(cuerpo["aporte"].sum(), guardada, rtol=1e-9, atol=1e-4), \
                 (modelo, mes, cuerpo["aporte"].sum(), guardada)
-            assert np.isclose(cuerpo["aporte_variacion_pp"].sum(),
+            assert np.isclose(cuerpo["aporte_variacion_produccion_pp"].sum(),
                               100 * (guardada / t.attrs["real_anterior"] - 1), atol=1e-9)
             assert np.isclose(t.attrs["prediccion"], guardada, rtol=1e-9, atol=1e-4)
     print("ok  aportes = predicción guardada y puntos = variación estimada "
@@ -65,13 +65,36 @@ def test_todas_las_variables_tienen_factor():
 
 def test_suma_contable_otras_ventas_no_mueve_la_variacion():
     t = explicar("suma_contable", "2026-08", BASE)
-    otras = t.loc[t["factor"] == "otras ventas", "aporte_variacion_pp"].iloc[0]
+    otras = t.loc[t["factor"] == "otras ventas", "aporte_variacion_produccion_pp"].iloc[0]
     assert abs(otras) < 1e-9
     print("ok  otras ventas entra con rezago 1: aporte nulo a la variación")
+
+
+def test_avisa_exportaciones_estimadas():
+    # 2026-07: INDEC ocultó el dato; 2026-08 no.
+    oculto = explicar("suma_contable", "2026-07", BASE)
+    assert oculto.attrs["exportaciones_estimadas"]
+    assert oculto.loc[oculto["factor"] == "exportaciones", "nota"].iloc[0] != ""
+    assert (oculto.loc[oculto["factor"] != "exportaciones", "nota"] == "").all()
+    assert not explicar("suma_contable", "2026-08", BASE).attrs["exportaciones_estimadas"]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        cana = explicar("elastic_net_bioetanol_cana", "2026-07", BASE)
+    assert not cana.attrs["exportaciones_estimadas"]   # bioetanol no usa exportaciones
+    print("ok  avisa cuando las exportaciones son un estimado (INDEC oculto)")
+
+
+def test_estacionalidad_con_nombre_por_serie():
+    assert grupo_de("lag_12", "bioetanol_maiz") == "estacionalidad (maíz)"
+    assert grupo_de("mes_6", "bioetanol_cana") == "estacionalidad (zafra)"
+    assert grupo_de("mes_6", "biodiesel") == "estacionalidad"
+    print("ok  la estacionalidad de maíz y la de caña salen con nombres distintos")
 
 
 if __name__ == "__main__":
     test_todas_las_variables_tienen_factor()
     test_suma_contable_otras_ventas_no_mueve_la_variacion()
+    test_avisa_exportaciones_estimadas()
+    test_estacionalidad_con_nombre_por_serie()
     test_reconstruye_prediccion_del_protocolo()
     print("\nTodas las pruebas de contribuciones pasaron.")

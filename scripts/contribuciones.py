@@ -19,10 +19,13 @@ Modelos (los elegidos en SCRUM-34, ver ``results/comparacion_final_eleccion.csv`
   variable y se agrupa en factores (ver ``grupo_de``). El indicador de faltante
   de una variable va con su variable.
 
-Puntos de variación
--------------------
-La variación estimada es contra el dato real del mes anterior,
-``100 × (predicción − real_{t−1}) / real_{t−1}``. Se reparte así:
+Puntos de variación de la producción
+------------------------------------
+La variación estimada es la de la producción tal cual (sin desestacionalizar)
+contra el dato real del mes anterior,
+``100 × (predicción − real_{t−1}) / real_{t−1}``. **No es la variación del
+IACA**: el índice se desestacionaliza y se suaviza (``error_iaca.py``), así que
+efectos como la estacionalidad o la zafra ahí no aparecen. Se reparte así:
 
 - Suma contable: cada destino aporta ``estimado_t − real_{t−1}`` (ventas al
   corte, exportaciones de la Secretaría y otras ventas del mes anterior). La
@@ -92,7 +95,8 @@ def grupo_de(variable: str, objetivo: str) -> str:
     # lag_12 (el mismo mes del año anterior) trae la estacionalidad; lag_1 y
     # lag_2 son inercia de corto plazo.
     if v.startswith("mes_") or v == "lag_12":
-        return "estacionalidad (zafra)" if objetivo == "bioetanol_cana" else "estacionalidad"
+        return {"bioetanol_cana": "estacionalidad (zafra)",
+                "bioetanol_maiz": "estacionalidad (maíz)"}.get(objetivo, "estacionalidad")
     if v.startswith(("lag_", "corte_efectivo")):
         return "inercia"   # el corte efectivo es casi circular: resume la mezcla reciente (SCRUM-31)
     if v.startswith("expo_"):
@@ -199,13 +203,26 @@ def _explicar_en(modelo_nombre: str, fecha: pd.Period, base: pd.DataFrame) -> tu
 
 # ---------------------------------------------------------------- interfaz
 
+AVISO_EXPO = ("INDEC ocultó la exportación del mes: el valor es un estimado "
+              "(mediana de los meses ocultos anteriores), no un dato")
+
+
+def _expo_oculta(fecha: pd.Period, base: pd.DataFrame) -> bool:
+    b = base["expo_indec_oculto"].copy()
+    b.index = pd.PeriodIndex(pd.to_datetime(b.index), freq="M")
+    return bool(b.get(fecha, 0) == 1)
+
+
 def explicar(modelo: str, fecha, base: pd.DataFrame | None = None) -> pd.DataFrame:
     """Tabla de contribuciones de ``modelo`` para el mes ``fecha``.
 
-    Columnas: ``factor``, ``aporte`` (tn o m³; suman la predicción) y
-    ``aporte_variacion_pp`` (puntos; suman la variación estimada contra el dato
-    real del mes anterior). En ``.attrs``: ``prediccion``, ``real_anterior``,
-    ``variacion_estimada_pct`` y, para el elastic net, ``detalle_variables``.
+    Columnas: ``factor``, ``aporte`` (tn o m³; suman la predicción),
+    ``aporte_variacion_produccion_pp`` (puntos; suman la variación estimada de
+    la producción contra el dato real del mes anterior, sin desestacionalizar:
+    no es la variación del IACA) y ``nota`` (aviso cuando el factor
+    exportaciones es un estimado porque INDEC ocultó el dato). En ``.attrs``:
+    ``prediccion``, ``real_anterior``, ``variacion_produccion_estimada_pct``,
+    ``exportaciones_estimadas`` y, para el elastic net, ``detalle_variables``.
     """
     base = _base() if base is None else base
     fecha = _periodo(fecha)
@@ -217,14 +234,20 @@ def explicar(modelo: str, fecha, base: pd.DataFrame | None = None) -> pd.DataFra
         raise ValueError(f"Modelo no soportado: {modelo}")
 
     real_ant = info["real_anterior"]
-    tabla["aporte_variacion_pp"] = 100 * tabla.pop("cambio") / real_ant
-    total = {"factor": "total", "aporte": tabla["aporte"].sum(),
-             "aporte_variacion_pp": tabla["aporte_variacion_pp"].sum()}
+    col = "aporte_variacion_produccion_pp"
+    tabla[col] = 100 * tabla.pop("cambio") / real_ant
+    total = {"factor": "total", "aporte": tabla["aporte"].sum(), col: tabla[col].sum()}
     tabla = pd.concat([tabla, pd.DataFrame([total])], ignore_index=True)
+    # Solo importa si el modelo usa exportaciones (bioetanol no las usa).
+    expo_estimada = (tabla["factor"] == "exportaciones").any() and _expo_oculta(fecha, base)
+    tabla["nota"] = ""
+    if expo_estimada:
+        tabla.loc[tabla["factor"] == "exportaciones", "nota"] = AVISO_EXPO
     tabla.insert(0, "fecha", str(fecha))
     tabla.insert(1, "modelo", modelo)
     tabla.attrs.update(info)
-    tabla.attrs["variacion_estimada_pct"] = 100 * (info["prediccion"] / real_ant - 1)
+    tabla.attrs["variacion_produccion_estimada_pct"] = 100 * (info["prediccion"] / real_ant - 1)
+    tabla.attrs["exportaciones_estimadas"] = expo_estimada
     return tabla
 
 
@@ -234,9 +257,13 @@ def main() -> None:
         sys.exit(1)
     t = explicar(sys.argv[1], sys.argv[2])
     pd.set_option("display.float_format", lambda v: f"{v:,.1f}")
-    print(t[["factor", "aporte", "aporte_variacion_pp"]].to_string(index=False))
+    print(t[["factor", "aporte", "aporte_variacion_produccion_pp"]].to_string(index=False))
     print(f"\npredicción: {t.attrs['prediccion']:,.0f} | mes anterior (real): "
-          f"{t.attrs['real_anterior']:,.0f} | variación estimada: {t.attrs['variacion_estimada_pct']:+.1f} %")
+          f"{t.attrs['real_anterior']:,.0f} | variación estimada de la producción: "
+          f"{t.attrs['variacion_produccion_estimada_pct']:+.1f} % (sin desestacionalizar; "
+          "no es la variación del IACA)")
+    if t.attrs["exportaciones_estimadas"]:
+        print(f"Aviso: {AVISO_EXPO}.")
 
 
 if __name__ == "__main__":
