@@ -25,12 +25,14 @@ y de caña), no el precio. Las respuestas registradas de la BCR están en
 
 ```
 BCR/
-├── data/           # series mensuales en CSV (target + variables externas)
-├── notebooks/      # análisis exploratorio y modelado
-├── scripts/        # scrapers, protocolo de evaluación y modelos de referencia
-├── results/        # métricas y salidas de los modelos
-├── spc/            # configuración real del X-13 de la BCR (archivos .spc)
-├── docs/           # documentación (protocolo de evaluación, features, fuentes)
+├── data/               # series mensuales en CSV (target + variables externas) y la base data/bcr.db (no versionada)
+├── db/                 # esquema, fuentes y series de la base unificada
+├── variables_externas/ # descarga de gasoil, nafta, molienda, aceite de soja, azúcar, INDEC y corte
+├── notebooks/          # análisis exploratorio y modelado
+├── scripts/            # scrapers, base, protocolo de evaluación, modelos y pruebas
+├── results/            # métricas y salidas de los modelos
+├── spc/                # configuración real del X-13 de la BCR (archivos .spc)
+├── docs/               # documentación (protocolo, features, modelos, informe)
 └── README.md
 ```
 
@@ -47,15 +49,18 @@ Todo es dato **público y oficial**.
 | `biodiesel_precios.csv` | Precio regulado del biodiesel | Secretaría de Energía | 2018→ |
 | `bioetanol_precios.csv` | Precio regulado del bioetanol (caña y maíz) | Secretaría de Energía | 2018→ |
 | `exportaciones_biodiesel_indec.csv` y `exportaciones_biodiesel_indec_tn.csv` | Exportaciones de biodiesel (NCM 38260000): si hubo, si el monto está oculto, toneladas y FOB. Llegan ~20 días después del mes, antes que la Secretaría | INDEC (comercio exterior) | 2012→ |
+| `corte_tramos.csv` → `corte_nominal_mensual.csv` | Corte obligatorio nominal de biodiesel y bioetanol, por norma | Boletín Oficial (ver `docs/corte.md`) | — |
+| `eventos.csv` | Eventos que se excluyen del entrenamiento | Elaboración propia (ver `docs/eventos.md`) | — |
+| `variables_externas/data/` | Ventas de gasoil y nafta, molienda de soja, aceite de soja y azúcar | Secretaría de Energía, SAGyP, Banco Mundial | ver `variables_externas/README.md` |
 
-Los precios, el tipo de cambio y los granos son **variables externas
-candidatas**; se decide cuáles entran al modelo en el análisis de variables
-(Etapa 3/4).
+Todas las series se cargan en la **base unificada** (`data/bcr.db`, SQLite),
+que guarda cada versión descargada sin pisar la anterior y calcula las
+variables derivadas (márgenes, corte efectivo). Detalle en `db/README.md`.
 
 ## Requisitos
 
 ```bash
-pip install pandas numpy openpyxl xlrd requests beautifulsoup4 matplotlib statsmodels jupyter x13binary
+pip install pandas numpy scipy scikit-learn openpyxl xlrd requests beautifulsoup4 matplotlib statsmodels jupyter x13binary
 ```
 
 `x13binary` trae el motor del X-13; no hace falta instalar el programa del
@@ -72,7 +77,19 @@ python scripts/scrape_cac_soja_maiz.py     # soja y maíz
 python scripts/scrape_tipo_cambio.py       # tipo de cambio
 python scripts/scrape_biocombustibles.py   # precios regulados
 python variables_externas/procesar_indec_biodiesel.py --hasta 2026-09   # exportaciones de biodiesel (INDEC); --hasta = último mes publicado
+python variables_externas/descargar_variables.py --output variables_externas/data     # molienda de soja
+python variables_externas/descargar_combustibles.py --output variables_externas/data  # ventas de gasoil y nafta
+python variables_externas/descargar_aceite_soja.py   # aceite de soja y azúcar (Banco Mundial)
+python variables_externas/armar_corte_nominal.py     # corte nominal mensual desde data/corte_tramos.csv
+python scripts/build_db.py                           # arma la base data/bcr.db con todo lo anterior
 ```
+
+**La base hay que armarla antes de correr cualquier modelo**: `data/bcr.db` no
+está en el repo. Cada uno la genera en su máquina con `build_db.py` y todos
+obtienen la misma, porque sale de las copias fechadas de `data/snapshots/`.
+
+El corte nominal no se descarga: cuando sale una norma nueva hay que cargar el
+tramo a mano en `data/corte_tramos.csv` (ver `docs/corte.md`).
 
 Las exportaciones de INDEC no se descargan solas: cada mes hay que bajar a
 mano el CSV del año en curso del sistema de consulta de INDEC y reemplazarlo en
@@ -87,7 +104,7 @@ cada descarga en `data/historico/` (para analizar revisiones de provisorios):
 python scripts/scrape_produccion_se.py ruta/al/estadisticas_biocombustibles.xlsx
 ```
 
-## Modelos de referencia
+## Modelos
 
 Los modelos se comparan con el **protocolo largo** (SCRUM-43): walk-forward
 a un mes, **backtest de selección de sep-2021 a ago-2025 (48 meses)** y
@@ -97,20 +114,43 @@ La métrica principal es **MAE** (tn o m³); MAPE, RMSE y acierto de signo se
 informan como métricas complementarias. Ver
 [`docs/protocolo_evaluacion.md`](docs/protocolo_evaluacion.md).
 
+Referencias:
+
 ```bash
-python scripts/protocolo_largo.py --sin-holdout   # referencias en backtest, sin usar holdout para elegir
-python scripts/baselines.py        # baselines de la ventana corta; genera results/baselines.csv
+python scripts/protocolo_largo.py --sin-holdout   # naive, naive estacional y X-13 BCR en el backtest
+python scripts/protocolo_largo.py                 # lo mismo con el holdout
 python scripts/replica_x13.py      # réplica del X-13 de la BCR (~15 min; --procesos N para paralelizar)
 python scripts/comparar_bcr_x13.py ruta/al/BIOCOMBUSTIBLES.xlsx   # validación contra su corrida real
-python scripts/comparacion.py      # integra baselines.csv con x13.csv para la ventana corta
+python scripts/baselines.py        # baselines de la ventana corta (histórico); results/baselines.csv
+python scripts/comparacion.py      # integra baselines.csv con x13.csv para la ventana corta (histórico)
 ```
 
-El **constructor común de features** (`scripts/construir_features.py`) ya está
-implementado y se utiliza en el trabajo de SARIMAX. Los modelos pendientes
-(elastic net y suma contable) deberán reutilizarlo y comprobar la
-disponibilidad temporal de sus variables. Detalle, grupos de features y
-descomposición contable del biodiésel en
-`docs/features.md`.
+Modelos propios (todos usan el **constructor común de features**,
+`scripts/construir_features.py`, ver `docs/features.md`):
+
+| Modelo | Script | Documentación |
+|---|---|---|
+| Suma contable (biodiésel): mercado interno + exportaciones + otras ventas | `scripts/suma_contable.py` | `docs/suma_contable.md` |
+| Elastic net con variables externas | `scripts/elastic_net.py` | `docs/elastic_net.md` |
+| SARIMAX con variables exógenas | `scripts/sarimax.py` | docstring del script |
+
+```bash
+python scripts/suma_contable.py --con-holdout
+python scripts/elastic_net.py --con-holdout
+python scripts/sarimax.py --con-holdout
+python scripts/comparacion_final.py      # compara todo y elige el modelo final (docs/comparacion_final.md)
+python scripts/error_iaca.py --modelo-final modelo_final --predicciones-extra results/modelo_final_predicciones.csv   # error sobre la variación del IACA (docs/error_iaca.md)
+python scripts/contribuciones.py suma_contable 2026-08   # qué factores explican la estimación de un mes (docs/contribuciones.md)
+```
+
+Sin `--con-holdout` los modelos corren solo el backtest. Las pruebas están en
+`scripts/test_*.py` y `scripts/prueba_*.py`; cada una se corre sola, por ejemplo
+`python scripts/test_suma_contable.py`.
+
+**Reproducibilidad:** la suma contable y el elastic net dan lo mismo en Windows
+y Linux. El X-13 cambia en meses puntuales entre Windows y Linux, y el SARIMAX
+de bioetanol según la versión de statsmodels. Los `results/` versionados se
+generaron en Linux; detalle en `docs/comparacion_final.md`, sección 8.
 
 La réplica del X-13 usa los **`.spc` reales de la BCR** (en `spc/`) tal cual:
 biodiesel y bioetanol, en log y en nivel, y aplica su **criterio de selección**
@@ -119,7 +159,9 @@ modelo fijo**: el ARIMA lo elige `automdl` en cada corrida. Con datos a julio
 2026 el pronóstico de agosto coincide con el de la BCR (0,0 %). Detalle,
 tratamiento de outliers y pendientes en `docs/x13_config_bcr.md`.
 
-## Resultados de referencia (backtest largo)
+## Resultados
+
+### Referencias (backtest largo)
 
 **MAE** sobre producción original (menor es mejor), septiembre 2021 a agosto
 2025, 48 meses. Fuente: [`results/protocolo_metricas.csv`](results/protocolo_metricas.csv).
@@ -140,9 +182,28 @@ modelo; sus resultados históricos siguen en `results/comparacion.csv`.
 
 Se prioriza MAE porque el MAPE atribuye más peso a un mismo error absoluto
 cuando la producción del mes es muy baja. **No se cambió cómo se calcula el
-MAPE**; sigue reportándose como referencia. Para la selección final, se
-comparará con Diebold-Mariano/intervalos de confianza y se preferirá el
-modelo más interpretable sin pérdida significativa de precisión (SCRUM-34).
+MAPE**; sigue reportándose como referencia.
+
+### Modelo final (SCRUM-34)
+
+Regla: el modelo más interpretable cuyo error no sea significativamente peor
+que el del mejor (Diebold-Mariano, p < 0,05), elegido solo con el backtest. El
+holdout se corrió una vez para confirmar. MAE en tn (biodiésel) y m³
+(bioetanol); fuente `results/comparacion_final_metricas.csv`.
+
+| Serie | Modelo final | MAE backtest | X-13 BCR backtest | MAE holdout | X-13 BCR holdout |
+|---|---|---:|---:|---:|---:|
+| Biodiésel | suma contable | **21.947** | 28.264 | **11.896** | 17.360 |
+| Bioetanol total | elastic net (maíz + caña) | **7.242** | 7.289 | 8.069 | **7.372** |
+| Bioetanol maíz | elastic net | 5.449 | **5.092** | 5.155 | **3.812** |
+| Bioetanol caña | elastic net | 5.661 | **5.282** | 4.610 | **4.289** |
+
+**Ningún modelo final le gana al X-13 de la BCR de forma significativa.** En
+biodiésel la suma contable tiene menos error en las dos ventanas, pero sin
+significancia (p = 0,10 y 0,16). En bioetanol los errores son prácticamente
+iguales. Lo que se gana es la explicación: cada estimación se descompone en
+factores (`docs/contribuciones.md`). Lo mismo vale para el error sobre la
+variación del IACA (`docs/comparacion_final.md`, sección 7).
 
 `results/baselines.csv` es el **único CSV canónico** de métricas de baselines
 para la ventana corta: lo genera `scripts/baselines.py` y lo consumen
@@ -167,19 +228,23 @@ mantiene su propio resumen por modelo **y ventana** en
 
 - [x] **Etapa 1** — Entendimiento del problema y del modelo actual de la BCR.
 - [x] **Etapa 2** — Recolección principal: producción, INDEC (SCRUM-57),
-  precio del azúcar (SCRUM-58) y corte obligatorio (SCRUM-48).
-- [x] **EDA del target** — EDA de producción y correcciones completadas.
-- [x] **EDA de variables externas (SCRUM-28)** — Finalizada: notebook,
-  tabla de candidatas y comprobaciones de fechas del backtest.
-- [x] **Referencias y evaluación** — Baselines, réplica X-13 BCR,
-  protocolo largo y constructor común de features (SCRUM-59).
-- [x] **SARIMAX (SCRUM-29 y SCRUM-62)** — Implementación inicial y
-  agregado de variables exógenas pendientes finalizados.
-- [ ] **Modelado interpretable y entrega** — Faltan integrar la suma contable
-  (SCRUM-60) y elastic net (SCRUM-54), elegir el modelo final (SCRUM-34),
-  y completar el pipeline, registro e informe.
+  precio del azúcar (SCRUM-58), corte obligatorio (SCRUM-48) y base
+  unificada (SCRUM-27 y SCRUM-56). Septiembre 2026 sumado (SCRUM-63).
+- [x] **EDA** — Producción (SCRUM-19 y SCRUM-45) y variables externas (SCRUM-28).
+- [x] **Referencias y evaluación** — Baselines, réplica X-13 BCR, protocolo
+  largo con holdout de 13 meses (SCRUM-43 y SCRUM-63) y constructor común de
+  features (SCRUM-59).
+- [x] **Modelos** — SARIMAX (SCRUM-29 y SCRUM-62), suma contable (SCRUM-60),
+  eventos (SCRUM-53), elastic net (SCRUM-54) y aporte de las variables clave
+  (SCRUM-31).
+- [x] **Modelo final** — Comparación y elección (SCRUM-34) y error sobre la
+  variación del IACA (SCRUM-42).
+- [x] **Informe, parte 1** — Contexto y método (SCRUM-36), en `docs/informe/`.
+- [ ] **Explicación por contribuciones** (SCRUM-35) — en revisión.
+- [ ] **Entrega** — Pipeline (SCRUM-38), registro de estimaciones (SCRUM-44),
+  informe parte 2 (SCRUM-61) y presentación final (SCRUM-37).
 
-Estado del backlog consultado el **29/10/2026**. Los datos y métricas
+Estado del backlog consultado el **10/11/2026**. Los datos y métricas
 versionados no prueban por sí solos la finalización de los tickets pendientes.
 
 ## Equipo
