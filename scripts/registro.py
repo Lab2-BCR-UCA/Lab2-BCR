@@ -26,9 +26,12 @@ escribe el CSV.
 Reglas:
 
 - Solo se agregan filas; nunca se modifica una fila existente.
-- Las columnas del dato real se completan una sola vez, con el primer dato
-  publicado (aunque sea provisorio; queda marcado en ``real_provisorio``).
+- Las columnas del dato real se completan una sola vez, con la primera versión
+  publicada del mes que hay en la base, aunque ``completar`` se corra después
+  de una revisión (si era provisorio queda marcado en ``real_provisorio``).
 - Cada vez que se escribe se controla que las filas anteriores no cambiaron.
+- Si un mes se estima más de una vez quedan todas las corridas; para medir el
+  error cuenta la última (``ultimas_estimaciones``).
 
 Uso, desde la raíz del repo (antes correr ``python scripts/build_db.py``):
 
@@ -189,8 +192,7 @@ def produccion_en_base(ruta_db: Path | str = RUTA_DB) -> tuple[dict[str, pd.Seri
         datos usada (sirve para la consulta "qué se sabía en una fecha dada"
         de db/README.md).
     """
-    if not Path(ruta_db).exists():
-        raise FileNotFoundError(f"No existe {ruta_db}. Correr antes python scripts/build_db.py")
+    _exigir_base(ruta_db)
     con = sqlite3.connect(ruta_db)
     try:
         ids = ", ".join(f"'{i}'" for i in SERIES.values())
@@ -206,15 +208,37 @@ def produccion_en_base(ruta_db: Path | str = RUTA_DB) -> tuple[dict[str, pd.Seri
 
 
 def reales_en_base(ruta_db: Path | str = RUTA_DB) -> pd.DataFrame:
-    """Producción publicada: serie_id, mes_estimado, valor, provisorio y fecha de la descarga."""
+    """Primer dato publicado de cada mes: serie_id, mes_estimado, valor, provisorio y fecha de la descarga.
+
+    Toma la primera versión de cada mes que hay en la base, no la última: así
+    el real es el mismo aunque ``completar`` se corra después de que la
+    Secretaría revise el dato.
+    """
+    _exigir_base(ruta_db)
     con = sqlite3.connect(ruta_db)
     try:
         ids = ", ".join(f"'{i}'" for i in SERIES.values())
-        df = pd.read_sql(f"SELECT serie_id, fecha AS mes_estimado, valor, provisorio, fecha_descarga "
-                         f"FROM v_ultima_version WHERE serie_id IN ({ids})", con)
+        df = pd.read_sql(f"""
+            SELECT serie_id, fecha AS mes_estimado, valor, provisorio, fecha_descarga
+            FROM (
+                SELECT o.serie_id, o.fecha, o.valor, o.provisorio, d.fecha_descarga,
+                       ROW_NUMBER() OVER (PARTITION BY o.serie_id, o.fecha
+                                          ORDER BY d.fecha_descarga, o.descarga_id) AS orden
+                FROM observaciones o JOIN descargas d USING (descarga_id)
+                WHERE o.serie_id IN ({ids})
+            )
+            WHERE orden = 1""", con)
     finally:
         con.close()
     return df
+
+
+def _exigir_base(ruta_db: Path | str | None) -> None:
+    if ruta_db is None:
+        raise ValueError("Sin base (ruta_db=None) hay que pasar los datos a mano "
+                         "(produccion y fecha_descarga_datos al registrar, reales al completar).")
+    if not Path(ruta_db).exists():
+        raise FileNotFoundError(f"No existe {ruta_db}. Correr antes python scripts/build_db.py")
 
 
 # ------------------------------------------------------------ X-13 y variación
@@ -421,7 +445,7 @@ DESCRIPCIONES = {
     "indice_pronosticado": "Índice que se publicaría con este pronóstico.",
     "variacion_pronosticada_pct": "Variación mensual del índice que se publicaría con este pronóstico (%).",
     "valor_real": "Producción publicada por la Secretaría de Energía (primer dato disponible).",
-    "real_provisorio": "1 si el dato publicado era provisorio cuando se completó.",
+    "real_provisorio": "1 si el primer dato publicado era provisorio.",
     "fecha_real": "Fecha de la descarga que trajo el dato real.",
     "error_produccion": "Pronóstico menos real (positivo: se sobreestimó).",
     "variacion_con_real_pct": "Variación del índice que habría dado el dato real, con los mismos ajustes de X-13 (%).",
@@ -430,8 +454,25 @@ DESCRIPCIONES = {
 }
 
 
+def ultimas_estimaciones(df: pd.DataFrame) -> pd.DataFrame:
+    """Se queda con la última corrida de cada serie, mes y modelo.
+
+    Si un mes se estimó más de una vez (por ejemplo, porque se corrigieron
+    datos y se volvió a correr), todas las corridas quedan en el registro,
+    pero para medir el error cuenta la última: es la que se habría publicado.
+    """
+    orden = df.sort_values(["fecha_corrida", "estimacion_id"])
+    return (orden.drop_duplicates(["serie_id", "mes_estimado", "modelo"], keep="last")
+            .sort_values("estimacion_id").reset_index(drop=True))
+
+
 def exportar_excel(ruta: Path | str = RUTA_REGISTRO, ruta_excel: Path | str = RUTA_EXCEL) -> Path:
-    """Exporta el registro a Excel: una hoja con los datos y otra con qué es cada columna."""
+    """Exporta el registro a Excel.
+
+    Hojas: ``ultima_por_mes`` (la última estimación de cada mes, la que se usa
+    para medir el error), ``registro`` (todas las corridas) y ``columnas``
+    (qué es cada columna).
+    """
     from openpyxl.utils import get_column_letter
 
     df = leer_registro(ruta)
@@ -441,17 +482,19 @@ def exportar_excel(ruta: Path | str = RUTA_REGISTRO, ruta_excel: Path | str = RU
                 "indice_pronosticado": "0.00", "variacion_pronosticada_pct": "0.00",
                 "variacion_con_real_pct": "0.00", "error_variacion_pp": "0.00"}
     with pd.ExcelWriter(ruta_excel, engine="openpyxl") as w:
+        ultimas_estimaciones(df).to_excel(w, sheet_name="ultima_por_mes", index=False)
         df.to_excel(w, sheet_name="registro", index=False)
         pd.DataFrame({"columna": list(DESCRIPCIONES), "qué es": list(DESCRIPCIONES.values())}) \
             .to_excel(w, sheet_name="columnas", index=False)
-        hoja = w.sheets["registro"]
-        hoja.freeze_panes = "B2"
-        for j, col in enumerate(df.columns, 1):
-            letra = get_column_letter(j)
-            hoja.column_dimensions[letra].width = max(12, min(30, len(col) + 2))
-            if col in formatos:
-                for celda in hoja[letra][1:]:
-                    celda.number_format = formatos[col]
+        for nombre in ("ultima_por_mes", "registro"):
+            hoja = w.sheets[nombre]
+            hoja.freeze_panes = "B2"
+            for j, col in enumerate(df.columns, 1):
+                letra = get_column_letter(j)
+                hoja.column_dimensions[letra].width = max(12, min(30, len(col) + 2))
+                if col in formatos:
+                    for celda in hoja[letra][1:]:
+                        celda.number_format = formatos[col]
         w.sheets["columnas"].column_dimensions["A"].width = 28
         w.sheets["columnas"].column_dimensions["B"].width = 100
     return ruta_excel

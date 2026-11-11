@@ -59,9 +59,16 @@ al IACA por separado.
 
 - **Solo se agregan filas.** Antes de escribir se controla que ninguna fila
   anterior haya cambiado ni desaparecido; si pasa, no se escribe nada.
-- **El real se completa una sola vez**, con el primer dato publicado, aunque
-  sea provisorio (queda marcado en `real_provisorio`). Si después la
-  Secretaría lo revisa, la fila no se toca.
+- **El real se completa una sola vez**, con la primera versión del mes que hay
+  en la base, aunque sea provisoria (queda marcado en `real_provisorio`).
+  Como la base guarda todas las versiones, da lo mismo correr `completar`
+  enseguida o después de que la Secretaría revise el dato: siempre toma la
+  primera. Si después lo revisan, la fila no se toca.
+- **Si un mes se estima más de una vez** (por ejemplo, porque se corrigieron
+  datos y se volvió a correr), quedan todas las corridas, cada una con su
+  fecha. Para medir el error cuenta **la última de cada mes**, que es la que se
+  habría publicado: la devuelve `ultimas_estimaciones()` y es la hoja
+  `ultima_por_mes` del Excel.
 - **Solo se estima el mes siguiente al último dato.** Si el mes ya está
   publicado, o hay meses en el medio, frena.
 - **No se registra dos veces la misma corrida** (misma serie, mes, modelo y
@@ -97,8 +104,9 @@ exportar_excel()
 Orden recomendado en el pipeline: armar la base → `completar()` → estimar →
 `registrar()` → `exportar_excel()` → commitear `data/registro_estimaciones.csv`.
 
-El Excel tiene dos hojas: `registro`, con todas las filas, y `columnas`, con
-qué es cada columna.
+El Excel tiene tres hojas: `ultima_por_mes`, con la última estimación de cada
+mes (la que se usa para medir el error), `registro`, con todas las corridas, y
+`columnas`, con qué es cada columna.
 
 ## 6. Verificación
 
@@ -120,8 +128,9 @@ misma del protocolo. El registro simulado queda en
 
 Son los mismos números de `results/iaca_holdout_metricas.csv`.
 
-`python scripts/test_registro.py` prueba las reglas de la sección 4, la carga
-en la base y el Excel, sin correr X-13.
+`python scripts/test_registro.py` prueba las reglas de la sección 4 (incluido
+que un dato revisado no cambie el real ya publicado), la carga en la base, el
+Excel y los mensajes de error, sin correr X-13.
 
 ## 7. Cambio en `error_iaca.py`
 

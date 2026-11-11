@@ -153,22 +153,69 @@ def test_base_y_excel(tmp: Path) -> None:
     df.to_csv(ruta, index=False)
     _falla(lambda: build_db.reconstruir(raiz, db), ValueError, "registro_estimaciones")
 
-    # Excel con las dos hojas.
+    # Excel con las tres hojas. El mes se corrió dos veces: en "registro" están
+    # las dos corridas y en "ultima_por_mes" solo la última.
     ruta.unlink()
-    _registrar(ruta)
+    _registrar(ruta, pronostico=100000.0)
+    _registrar(ruta, pronostico=105000.0, fecha_corrida="2025-10-21 09:00:00")
     salida = registro.exportar_excel(ruta, tmp / "registro.xlsx")
     hojas = pd.read_excel(salida, sheet_name=None)
-    assert set(hojas) == {"registro", "columnas"}
-    assert len(hojas["registro"]) == 2
+    assert list(hojas) == ["ultima_por_mes", "registro", "columnas"]
+    assert len(hojas["registro"]) == 4
+    ultima = hojas["ultima_por_mes"]
+    assert len(ultima) == 2 and (ultima["fecha_corrida"] == "2025-10-21 09:00:00").all()
+    assert ultima.loc[ultima["modelo"] == "modelo_final", "pronostico"].tolist() == [105000.0]
     assert set(hojas["columnas"]["columna"]) == set(registro.COLUMNAS)
 
 
+def test_primer_dato_publicado(tmp: Path) -> None:
+    """completar usa la primera versión del mes, aunque después la hayan revisado."""
+    raiz = tmp / "repo"
+    _copiar_repo(raiz)
+    db = raiz / "data" / "bcr.db"
+    build_db.actualizar(raiz, db, "2026-11-11")
+    ruta = raiz / "data" / "registro_estimaciones.csv"
+    _registrar(ruta)
+
+    # La Secretaría revisa septiembre 2025 y se vuelve a armar la base.
+    csv = raiz / "data" / "produccion_biodiesel.csv"
+    datos = pd.read_csv(csv)
+    fila = pd.to_datetime(datos["fecha"]).dt.to_period("M") == MES
+    original = float(datos.loc[fila, "produccion_tn"].iloc[0])
+    datos.loc[fila, "produccion_tn"] = original + 1000
+    datos.to_csv(csv, index=False)
+    build_db.actualizar(raiz, db, "2026-11-20")
+
+    # La base tiene el dato revisado como última versión...
+    produccion, _ = registro.produccion_en_base(db)
+    assert produccion["biodiesel"].loc[MES] == original + 1000
+
+    # ...pero el registro se completa con el primero que se publicó.
+    registro.completar(ruta=ruta, ruta_db=db)
+    df = registro.leer_registro(ruta)
+    assert (df["valor_real"] == original).all()
+    assert (df["fecha_real"] == "2026-11-11").all()
+
+
+def test_sin_base(tmp: Path) -> None:
+    """Sin base y sin datos a mano, un mensaje claro en lugar de un TypeError."""
+    ruta = tmp / "registro.csv"
+    _registrar(ruta)
+    _falla(lambda: registro.completar(ruta=ruta, ruta_db=None), ValueError, "reales al completar")
+    _falla(lambda: registro.registrar("biodiesel", "2025-09", "m", 1.0, ruta=ruta, ruta_db=None),
+           ValueError, "produccion y fecha_descarga_datos")
+    _falla(lambda: registro.completar(ruta=ruta, ruta_db=tmp / "no_existe.db"),
+           FileNotFoundError, "build_db.py")
+
+
 def main() -> None:
-    pruebas = [test_registrar_y_completar, test_controles, test_base_y_excel]
+    pruebas = [test_registrar_y_completar, test_controles, test_base_y_excel,
+               test_primer_dato_publicado, test_sin_base]
+    con_carpeta = {test_base_y_excel, test_primer_dato_publicado, test_sin_base}
     for prueba in pruebas:
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
-            prueba(tmp if prueba is test_base_y_excel else tmp / "registro.csv")
+            prueba(tmp if prueba in con_carpeta else tmp / "registro.csv")
         print(f"ok  {prueba.__name__}")
     print("Todas las pruebas pasaron.")
 
