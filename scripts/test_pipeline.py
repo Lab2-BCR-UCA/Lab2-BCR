@@ -4,7 +4,9 @@
   evaluación: el pronóstico contra ``results/modelo_final_predicciones.csv`` y
   la variación del IACA contra ``results/iaca_holdout_detalle.csv``. Si
   coinciden, el pipeline estima igual que el modelo que se evaluó.
-- Controla que frene si faltan las ventas de gasoil o las exportaciones del mes.
+- Controla que frene si faltan las ventas de gasoil o las exportaciones del mes,
+  y antes del día 28 del mes siguiente, completando igual los reales.
+- Controla los reintentos de las descargas y los avisos de INDEC (sin red).
 - Controla las contribuciones: solo las del modelo final, sin la fila
   ``total``, que sumen el pronóstico del registro, que solo se agreguen y que
   si algo no cierra no se escriba ninguno de los dos archivos.
@@ -19,6 +21,8 @@ from __future__ import annotations
 
 import sys
 import tempfile
+from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -76,6 +80,111 @@ def test_frena_si_faltan_datos_del_mes():
     assert len(faltan) == 1 and "gasoil" in faltan[0]
     assert len(pipeline.faltantes_del_mes(base, mes + 1)) == 2
     print("ok  frena si todavía no están las ventas de gasoil o las exportaciones del mes")
+
+
+@contextmanager
+def _reemplazos(modulo, **nuevos):
+    """Reemplaza atributos de un módulo mientras dura el bloque."""
+    viejos = {k: getattr(modulo, k) for k in nuevos}
+    for k, v in nuevos.items():
+        setattr(modulo, k, v)
+    try:
+        yield
+    finally:
+        for k, v in viejos.items():
+            setattr(modulo, k, v)
+
+
+def test_frena_antes_del_28_y_completa_igual():
+    """Antes del 28 frena sin procesar INDEC ni estimar, pero arma la base y completa los reales."""
+    llamadas = []
+    falsos = dict(
+        ultimo_mes_produccion=lambda: pd.Period("2026-09", freq="M"),
+        procesar_indec=lambda *a, **k: llamadas.append("indec"),
+        armar_base=lambda: llamadas.append("base"),
+        leer_dataset=lambda: llamadas.append("leer") or leer_dataset(),
+        estimar=lambda *a, **k: llamadas.append("estimar"),
+    )
+    completar = lambda: llamadas.append("completar") or pd.DataFrame()  # noqa: E731
+    assert pipeline.fecha_para_correr(pd.Period("2026-10", freq="M")) == date(2026, 11, 28)
+    with _reemplazos(pipeline, **falsos), _reemplazos(registro, completar=completar):
+        # 27/11: todavía no se puede estimar octubre.
+        _falla(lambda: pipeline.correr(sin_descargas=True, hoy=date(2026, 11, 27)), "desde el 28/11/2026")
+        assert llamadas == ["base", "leer", "completar"], llamadas
+        assert isinstance(_error(lambda: pipeline.correr(sin_descargas=True, hoy=date(2026, 11, 27))),
+                          pipeline.TodaviaNoSePuedeEstimar)
+        # 28/11 en adelante: procesa INDEC; si faltan datos, completa antes de frenar.
+        llamadas.clear()
+        with _reemplazos(pipeline, faltantes_del_mes=lambda *a: ["ventas de gasoil"]):
+            _falla(lambda: pipeline.correr(sin_descargas=True, hoy=date(2026, 11, 28)), "ventas de gasoil")
+        assert llamadas == ["indec", "base", "leer", "completar"], llamadas
+    print("ok  antes del 28 frena con la fecha para volver a correr y completa igual los reales")
+
+
+def test_descargas_reintenta():
+    intentos = []
+
+    def correr_falso(respuestas):
+        def f(script):
+            intentos.append(script[0])
+            return respuestas.pop(0) if respuestas else (True, "")
+        return f
+
+    conexion = (False, "requests.exceptions.ConnectionError: Max retries exceeded")
+    with _reemplazos(pipeline.time, sleep=lambda s: None):
+        # Falla dos veces y a la tercera anda.
+        with _reemplazos(pipeline, _correr=correr_falso([conexion, conexion])):
+            assert pipeline.descargar() == []
+        assert intentos.count(pipeline.DESCARGAS[0][1][0]) == 3
+        # La producción no responde: tres intentos, mensaje claro y no sigue con las demás.
+        intentos.clear()
+        with _reemplazos(pipeline, _correr=correr_falso([conexion] * 3)):
+            assert pipeline.descargar() == [pipeline.DESCARGAS[0][0]]
+        assert len(intentos) == 3
+        ok, mensaje = None, None
+        with _reemplazos(pipeline, _correr=correr_falso([conexion] * 3)):
+            ok, mensaje = pipeline._descargar_una("x", ["x.py"])
+        assert not ok and "no responde" in mensaje and "No es un error del programa" in mensaje
+        # Un error del programa no se disfraza de sitio caído.
+        error = (False, "KeyError: 'produccion_tn'")
+        with _reemplazos(pipeline, _correr=correr_falso([error] * 3)):
+            ok, mensaje = pipeline._descargar_una("x", ["x.py"])
+        assert not ok and mensaje == "KeyError: 'produccion_tn'"
+    print("ok  las descargas se reintentan y, si el sitio no responde, lo dice")
+
+
+def test_avisos_de_indec():
+    mes = pd.Period("2026-10", freq="M")
+    corridas = []
+    with tempfile.TemporaryDirectory() as tmp, \
+            _reemplazos(pipeline, CARPETA_INDEC=Path(tmp), RAIZ=Path(tmp).parent,
+                        _correr=lambda s: corridas.append(s) or (True, "")):
+        # Antes del 20 de noviembre INDEC no publicó octubre: aviso, no FALLÓ.
+        assert pipeline.procesar_indec(mes, date(2026, 11, 15)) is False
+        # Sin archivo del año.
+        assert pipeline.procesar_indec(mes, date(2026, 11, 28)) is False
+        # Archivo bajado el 10/11, antes de que se publicara octubre: viejo.
+        def archivo(dia):
+            ms = int(pd.Timestamp(f"2026-11-{dia} 12:00", tz="America/Argentina/Buenos_Aires").timestamp() * 1000)
+            ruta = Path(tmp) / f"indec_38260000_2026_{ms}.csv"
+            ruta.write_text("x")
+            return ruta
+        viejo = archivo("10")
+        assert pipeline.procesar_indec(mes, date(2026, 11, 28)) is False
+        assert corridas == []
+        viejo.unlink()
+        archivo("21")
+        assert pipeline.procesar_indec(mes, date(2026, 11, 28)) is True
+        assert len(corridas) == 1 and corridas[0][-1] == "2026-10"
+    print("ok  INDEC: distingue 'todavía no publicó' de 'el CSV es viejo'")
+
+
+def _error(funcion):
+    try:
+        funcion()
+    except Exception as e:  # noqa: BLE001
+        return e
+    raise AssertionError("tenía que fallar")
 
 
 def _falla(funcion, texto: str) -> None:
@@ -150,6 +259,9 @@ def test_contribuciones():
 
 if __name__ == "__main__":
     test_frena_si_faltan_datos_del_mes()
+    test_frena_antes_del_28_y_completa_igual()
+    test_descargas_reintenta()
+    test_avisos_de_indec()
     test_contribuciones()
     test_simulacion_coincide_con_la_evaluacion()
     print("\nTodas las pruebas del pipeline pasaron.")

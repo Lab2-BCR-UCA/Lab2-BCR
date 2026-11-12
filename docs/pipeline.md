@@ -8,14 +8,25 @@ Pruebas: `scripts/test_pipeline.py`.
 Un solo comando deja la estimación del mes, su explicación y el registro:
 
 1. **Descargas**: producción, granos, tipo de cambio, precios regulados,
-   molienda, gasoil y nafta, aceite de soja y azúcar. Si una fuente falla,
-   avisa y sigue con los datos que ya había.
+   molienda, gasoil y nafta, aceite de soja y azúcar. Cada fuente se prueba
+   hasta 3 veces, con pausas de 10 y 30 segundos. Si sigue fallando, avisa y
+   sigue con los datos que ya había; si es la producción, frena (sin ella no
+   se sabe qué mes estimar). Cuando el problema es que el sitio no responde, lo
+   dice así: no es un error del programa.
+
+   Con la producción se sabe el mes a estimar. **Si todavía no es el día 28 del
+   mes siguiente**, avisa en ese momento que no se puede estimar y desde qué
+   fecha volver a correr (las ventas de gasoil salen los días 25-27). Igual
+   arma la base y completa los reales (pasos 3 y 4) y termina ahí.
 2. **Exportaciones de INDEC**: procesa el CSV anual hasta el mes a estimar. El
-   CSV se baja a mano (`docs/exportaciones_indec.md`); si falta o es viejo,
-   avisa.
+   CSV se baja a mano (`docs/exportaciones_indec.md`). Distingue tres casos:
+   INDEC todavía no publicó el mes (aviso: hay que esperar, sale alrededor del
+   día 20), falta el CSV del año, o el CSV es viejo porque se bajó antes de que
+   INDEC publicara el mes (hay que bajarlo de nuevo).
 3. **Base**: `build_db.py`.
 4. **Registro**: completa el real de las estimaciones anteriores que ya se
-   publicaron (SCRUM-44).
+   publicaron (SCRUM-44). Va antes del control de los datos del mes, así se
+   completan aunque después no se pueda estimar.
 5. **Estimación**: el mes siguiente al último dato de producción, con el modelo
    final de cada serie (`results/comparacion_final_eleccion.csv`, SCRUM-34):
    suma contable para biodiésel y elastic net para bioetanol maíz, caña y total.
@@ -37,7 +48,11 @@ Si todavía no están las ventas de gasoil o las exportaciones de INDEC del mes
 a estimar, frena antes de estimar y dice cuál falta: la suma contable no puede
 estimar sin ellas. Las ventas de gasoil salen los días 25-27 del mes siguiente
 y las exportaciones de INDEC alrededor del día 20, así que la corrida mensual
-va después del 27.
+va desde el 28.
+
+Cuando frena por eso (antes del 28 o porque faltan esos datos) termina con
+`NO SE ESTIMÓ (no es un error)` y código de salida 0: no hay nada roto, hay que
+volver a correr más tarde. Los errores de verdad terminan con `ERROR` y código 1.
 
 ## 2. Uso
 
@@ -102,10 +117,15 @@ respaldo** después de cada corrida.
 También prueba que frene si faltan gasoil o exportaciones del mes, y que las
 contribuciones no se repitan ni se pisen.
 
+También prueba, sin red y sin X-13, que antes del 28 frene con la fecha para
+volver a correr y complete igual los reales, que las descargas se reintenten y
+digan cuándo el sitio no responde, y los tres avisos de INDEC.
+
 Probado en Linux con Python 3.13.16, pandas 3.0.5, numpy 2.5.3,
 scikit-learn 1.9.1, scipy 1.18.1, statsmodels 0.15.0, openpyxl 3.1.5 y
-x13binary 1.1.61. **Falta probarlo en una máquina limpia con Windows**: el
-X-13 da distinto en algunos meses entre Windows y Linux
+x13binary 1.1.61, y en Windows con un entorno nuevo (Python 3.14, en una ruta
+con espacio y tilde): pasan las pruebas, la simulación y la corrida con
+`--sin-descargas`. El X-13 da distinto en algunos meses entre Windows y Linux
 (`docs/comparacion_final.md`, sección 8), así que la variación del IACA
 registrada en la BCR puede diferir de la nuestra en esos meses. Es la que la
 BCR publicaría con su máquina.
@@ -114,7 +134,11 @@ BCR publicaría con su máquina.
 
 | Mensaje | Qué hacer |
 |---|---|
-| `FALLÓ <fuente>` en las descargas | Sigue con los datos anteriores de esa fuente. Si falla la producción frena, porque sin ella no se sabe qué mes estimar: reintentar más tarde o pasar el `.xlsx` a mano (`python scripts/scrape_produccion_se.py ruta.xlsx`) y correr con `--sin-descargas`. |
-| `FALTA el CSV de INDEC` o `se bajó ... antes de que INDEC publicara` | Bajar el CSV del año (`docs/exportaciones_indec.md`) y volver a correr. |
-| `Todavía no están los datos de <mes>` | Gasoil o exportaciones del mes no salieron. Correr después del 27. |
+| `FALLÓ <fuente>: el sitio no responde` | No es un error del programa: el sitio está caído o no contesta (ya se reintentó 3 veces). Sigue con los datos anteriores de esa fuente. Si es la producción frena, porque sin ella no se sabe qué mes estimar: esperar unas horas y volver a correr. Si el caído es el sitio de la Secretaría de Energía (energia.gob.ar), el portal datos.energia.gob.ar no sirve de alternativa porque baja del mismo servidor. |
+| `FALLÓ <fuente>: <otro mensaje>` | Puede ser un cambio en el archivo de la fuente. Pasarle el mensaje al equipo. |
+| `Todavía no se puede estimar <mes>. Volver a correr desde el <fecha>` | Es antes del 28 del mes siguiente. Igual se completaron los reales; volver a correr desde esa fecha. |
+| `aviso INDEC todavía no publicó` | INDEC publica alrededor del día 20 del mes siguiente. Esperar. |
+| `FALTA el CSV de INDEC` | Bajar el CSV del año (`docs/exportaciones_indec.md`) y volver a correr. |
+| `VIEJO el CSV de INDEC` | Se bajó antes de que INDEC publicara el mes. Bajarlo de nuevo, borrar el anterior y volver a correr. |
+| `Todavía no están los datos de <mes>` | Gasoil o exportaciones del mes no salieron todavía (por ejemplo, salieron tarde). Volver a correr cuando salgan. |
 | `Ya está registrada` | Ese mes ya se estimó en esa misma corrida. |

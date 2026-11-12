@@ -2,11 +2,18 @@
 
 Un solo comando que deja la estimación del mes, su explicación y el registro:
 
-1. Descarga los datos públicos (si una fuente falla, avisa y sigue).
+1. Descarga los datos públicos. Cada fuente se reintenta hasta 3 veces; si
+   sigue sin responder, avisa y sigue con los datos anteriores (si es la
+   producción, frena: sin ella no se sabe qué mes estimar).
+   Si todavía no es el día 28 del mes siguiente al mes a estimar, avisa en ese
+   momento que no se puede estimar y desde qué fecha volver a correr; igual
+   arma la base y completa los reales (pasos 3 y 4) antes de terminar.
 2. Procesa las exportaciones de INDEC del mes a estimar (el CSV anual se baja
-   a mano, ver ``docs/exportaciones_indec.md``).
+   a mano, ver ``docs/exportaciones_indec.md``). Distingue "INDEC todavía no
+   publicó el mes" (aviso) de "el CSV es viejo" (hay que bajarlo de nuevo).
 3. Arma la base (``build_db.py``).
-4. Completa en el registro el real de los meses que ya se publicaron.
+4. Completa en el registro el real de los meses que ya se publicaron. Va antes
+   del control de datos del mes, así se completan aunque no se pueda estimar.
 5. Estima el mes siguiente al último dato de producción con el modelo final
    de cada serie (``results/comparacion_final_eleccion.csv``, SCRUM-34).
 6. Calcula las contribuciones de cada estimación (SCRUM-35).
@@ -40,10 +47,12 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
+import time
 import warnings
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -55,6 +64,9 @@ import registro  # noqa: E402
 from build_db import leer_dataset  # noqa: E402
 from construir_features import OBJETIVOS  # noqa: E402
 from contribuciones import explicar  # noqa: E402
+
+sys.path.insert(0, str(RAIZ / "variables_externas"))
+from procesar_indec_biodiesel import DIAS_PUBLICACION, anio_de, descargado_el  # noqa: E402
 
 RUTA_CONTRIBUCIONES = registro.RUTA_CONTRIBUCIONES
 RUTA_ELECCION = RAIZ / "results" / "comparacion_final_eleccion.csv"
@@ -72,6 +84,24 @@ INSUMOS_BIODIESEL = {
     "ventas_gasoil_total_m3": "ventas de gasoil (Secretaría de Energía, salen los días 25-27)",
     "expo_indec_oculto": "exportaciones de INDEC (salen alrededor del día 20)",
 }
+
+# Las ventas de gasoil del mes salen los días 25-27 del mes siguiente: antes del
+# 28 no se puede estimar.
+DIA_CORRIDA = 28
+
+# Reintentos de cada descarga: hasta 3 intentos, con estas pausas (segundos).
+PAUSAS_REINTENTO = (10, 30)
+# Errores de red o del servidor: el sitio no responde, no es un error del programa.
+SIN_RESPUESTA = re.compile(
+    r"ConnectionError|ConnectTimeout|ReadTimeout|Timeout|timed out|Max retries|NameResolution|"
+    r"getaddrinfo|RemoteDisconnected|Connection (?:reset|refused|aborted)|SSLError|ProxyError|"
+    r"ChunkedEncodingError|IncompleteRead|URLError|HTTPError: 5\d\d|HTTP Error 5\d\d|"
+    r"Bad Gateway|Service Unavailable|Gateway Time-?out", re.IGNORECASE)
+
+
+class TodaviaNoSePuedeEstimar(RuntimeError):
+    """Faltan datos del mes que todavía no se publicaron. No es un error: volver a correr más tarde."""
+
 
 DESCARGAS = [
     ("producción (Secretaría de Energía)", ["scripts/scrape_produccion_se.py"]),
@@ -96,15 +126,48 @@ def _correr(script: list[str]) -> tuple[bool, str]:
     return r.returncode == 0, (salida[-1] if salida else "")
 
 
+def _sin_respuesta(mensaje: str) -> bool:
+    return bool(SIN_RESPUESTA.search(mensaje))
+
+
+def _descargar_una(nombre: str, script: list[str]) -> tuple[bool, str]:
+    """Corre una descarga con reintentos. Devuelve si anduvo y el último mensaje."""
+    intentos = len(PAUSAS_REINTENTO) + 1
+    for i in range(intentos):
+        ok, ultima = _correr(script)
+        if ok:
+            return True, ""
+        if i < intentos - 1:
+            pausa = PAUSAS_REINTENTO[i]
+            print(f"  ...   {nombre}: no anduvo (intento {i + 1} de {intentos}), "
+                  f"se reintenta en {pausa} s", flush=True)
+            time.sleep(pausa)
+    if _sin_respuesta(ultima):
+        return False, (f"el sitio no responde (se probó {intentos} veces). No es un error del "
+                       "programa: probar más tarde.")
+    return False, ultima
+
+
 def descargar() -> list[str]:
-    """Corre las descargas automáticas. Devuelve las que fallaron (no frena)."""
+    """Corre las descargas automáticas. Devuelve las que fallaron.
+
+    Si falla la producción (la primera) no sigue con las demás: sin ella no se
+    sabe qué mes estimar y ``correr`` frena.
+    """
     fallas = []
     for nombre, script in DESCARGAS:
-        ok, ultima = _correr(script)
-        print(f"  {'ok   ' if ok else 'FALLÓ'} {nombre}" + ("" if ok else f": {ultima}"), flush=True)
+        ok, mensaje = _descargar_una(nombre, script)
+        print(f"  {'ok   ' if ok else 'FALLÓ'} {nombre}" + ("" if ok else f": {mensaje}"), flush=True)
         if not ok:
             fallas.append(nombre)
+            if nombre == DESCARGAS[0][0]:
+                break
     return fallas
+
+
+def fecha_para_correr(mes: pd.Period) -> date:
+    """Desde cuándo se puede estimar ``mes``: el día 28 del mes siguiente."""
+    return (mes + 1).to_timestamp().date().replace(day=DIA_CORRIDA)
 
 
 def ultimo_mes_produccion() -> pd.Period:
@@ -113,15 +176,49 @@ def ultimo_mes_produccion() -> pd.Period:
     return pd.Period(df.loc[df["produccion_tn"].notna(), "fecha"].max(), freq="M")
 
 
-def procesar_indec(mes: pd.Period) -> bool:
-    """Procesa el CSV anual de INDEC hasta ``mes``. Avisa si falta el archivo del año."""
-    if not any(CARPETA_INDEC.glob(f"*_{mes.year}_*.csv")):
-        print(f"  FALTA el CSV de INDEC de {mes.year} en {CARPETA_INDEC.relative_to(RAIZ)} "
-              "(ver docs/exportaciones_indec.md)")
+def procesar_indec(mes: pd.Period, hoy: date | None = None) -> bool:
+    """Procesa el CSV anual de INDEC hasta ``mes``. Devuelve si quedó procesado.
+
+    Distingue tres casos sin procesar: INDEC todavía no publicó el mes (aviso:
+    esperar), falta el CSV del año o el CSV es viejo (se bajó antes de que
+    INDEC publicara el mes: hay que bajarlo de nuevo).
+    """
+    hoy = hoy or date.today()
+    publicado = (mes + 1).to_timestamp().date().replace(day=DIAS_PUBLICACION)
+    if hoy < publicado:
+        print(f"  aviso INDEC todavía no publicó las exportaciones de {mes.strftime('%m/%Y')} (salen alrededor "
+              f"del {publicado:%d/%m/%Y}). No es un error: hay que esperar.")
+        return False
+    del_anio = [a for a in CARPETA_INDEC.glob("*.csv") if _anio(a) == mes.year]
+    guia = "ver docs/exportaciones_indec.md"
+    if not del_anio:
+        print(f"  FALTA el CSV de INDEC de {mes.year} en {CARPETA_INDEC.relative_to(RAIZ)}: "
+              f"bajarlo ({guia}) y volver a correr.")
+        return False
+    viejos = [a for a in del_anio if _bajado(a) is not None and _bajado(a) < publicado]
+    if viejos:
+        print(f"  VIEJO el CSV de INDEC de {mes.year} ({viejos[0].name}): se bajó el "
+              f"{_bajado(viejos[0]):%d/%m/%Y}, antes de que INDEC publicara {mes.strftime('%m/%Y')}. "
+              f"Bajarlo de nuevo ({guia}), borrar el anterior y volver a correr.")
         return False
     ok, ultima = _correr(["variables_externas/procesar_indec_biodiesel.py", "--hasta", str(mes)])
     print(f"  {'ok   ' if ok else 'FALLÓ'} exportaciones de INDEC hasta {mes}" + ("" if ok else f": {ultima}"))
     return ok
+
+
+def _anio(ruta: Path) -> int | None:
+    try:
+        return anio_de(ruta)
+    except ValueError:
+        return None
+
+
+def _bajado(ruta: Path) -> date | None:
+    """Fecha de descarga del CSV de INDEC. Si el nombre no la tiene, la valida el procesamiento."""
+    try:
+        return descargado_el(ruta).date()
+    except ValueError:
+        return None
 
 
 def armar_base() -> None:
@@ -193,9 +290,18 @@ def armar_contribuciones(tablas: dict[str, pd.DataFrame], ids: dict[str, int]) -
 
 # ------------------------------------------------------------------ corrida
 
-def correr(sin_descargas: bool = False, simular: str | None = None) -> dict:
+def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | None = None) -> dict:
     """Corre el pipeline. Devuelve el mes, las tablas de contribuciones, las filas
-    agregadas al registro y, si es una simulación, los reales del mes."""
+    agregadas al registro y, si es una simulación, los reales del mes.
+
+    Si todavía no se puede estimar el mes (antes del día 28 del mes siguiente,
+    o faltan las ventas de gasoil o las exportaciones), completa igual los
+    reales del registro y levanta ``TodaviaNoSePuedeEstimar``.
+
+    Args:
+        hoy: Fecha de la corrida (pruebas). Por defecto, hoy.
+    """
+    hoy = hoy or date.today()
     print(f"Pipeline de estimación — {datetime.now():%d/%m/%Y %H:%M}\n", flush=True)
     elegidos = modelos_elegidos()
 
@@ -219,25 +325,35 @@ def correr(sin_descargas: bool = False, simular: str | None = None) -> dict:
             print("1. Descargas")
             fallas = descargar()
             if DESCARGAS[0][0] in fallas:
-                raise RuntimeError("No se pudo descargar la producción: sin ella no se sabe qué mes "
-                                   "estimar. Reintentar más tarde o pasar el .xlsx a mano "
-                                   "(python scripts/scrape_produccion_se.py ruta.xlsx) y correr con "
-                                   "--sin-descargas.")
+                raise RuntimeError("No se pudo descargar la producción de la Secretaría de Energía y "
+                                   "sin ella no se sabe qué mes estimar. Si el sitio no responde, no "
+                                   "es un error del programa: esperar y volver a correr más tarde.")
             if fallas:
                 print(f"  Aviso: fallaron {len(fallas)} descargas; se sigue con los datos anteriores.")
         mes = ultimo_mes_produccion() + 1
-        print(f"\nMes a estimar: {mes}\n\n2. Exportaciones de INDEC")
-        procesar_indec(mes)
+        desde = fecha_para_correr(mes)
+        temprano = hoy < desde
+        print(f"\nMes a estimar: {mes}")
+        if temprano:
+            print(f"  Todavía no se puede estimar {mes.strftime('%m/%Y')}: las ventas de gasoil de ese mes salen "
+                  f"los días 25-27 del mes siguiente. Volver a correr desde el {desde:%d/%m/%Y}.\n"
+                  "  Igual se arma la base y se completan los reales de los meses ya publicados.")
+        else:
+            print("\n2. Exportaciones de INDEC")
+            procesar_indec(mes, hoy)
         print("\n3. Base")
         armar_base()
         base = leer_dataset()
-        faltan = faltantes_del_mes(base, mes)
-        if faltan:
-            raise RuntimeError(f"Todavía no están los datos de {mes} de: " + "; ".join(faltan)
-                               + ". Volver a correr cuando salgan.")
         print("\n4. Registro: reales publicados")
         hechas = registro.completar()
         print(f"  ok    {len(hechas)} estimaciones anteriores completadas con el real")
+        if temprano:
+            raise TodaviaNoSePuedeEstimar(f"Todavía no se puede estimar {mes.strftime('%m/%Y')}. Volver a correr "
+                                          f"desde el {desde:%d/%m/%Y}.")
+        faltan = faltantes_del_mes(base, mes)
+        if faltan:
+            raise TodaviaNoSePuedeEstimar(f"Todavía no están los datos de {mes.strftime('%m/%Y')} de: "
+                                          + "; ".join(faltan) + ". Volver a correr cuando salgan.")
         ruta_registro, ruta_contrib = registro.RUTA_REGISTRO, RUTA_CONTRIBUCIONES
         ruta_db, produccion, fecha_datos, reales = registro.RUTA_DB, None, None, None
 
@@ -305,6 +421,9 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     try:
         correr(a.sin_descargas, a.simular)
+    except TodaviaNoSePuedeEstimar as e:
+        print(f"\nNO SE ESTIMÓ (no es un error): {e}")
+        return 0
     except (RuntimeError, ValueError, FileNotFoundError) as e:
         print(f"\nERROR: {e}", file=sys.stderr)
         return 1

@@ -218,7 +218,7 @@ dato con el modelo final, explica la estimación y la guarda en el registro
 junto con sus contribuciones. Detalle en [`docs/pipeline.md`](docs/pipeline.md).
 
 ```bash
-python scripts/pipeline.py                    # corrida mensual
+python scripts/pipeline.py                    # corrida mensual (desde el día 28)
 python scripts/pipeline.py --simular 2026-09  # demo con un mes ya publicado (no toca el registro)
 python scripts/test_pipeline.py               # pruebas (~2 min, corre X-13)
 ```
@@ -270,8 +270,8 @@ python scripts/prueba_registro_holdout.py   # simula el holdout y compara con SC
 - [x] **Informe, parte 1** — Contexto y método (SCRUM-36), en `docs/informe/`.
 - [x] **Explicación y registro** — Contribuciones (SCRUM-35) y registro de
   estimaciones (SCRUM-44).
-- [ ] **Entrega** — Pipeline (SCRUM-38, falta probarlo en Windows), informe
-  parte 2 (SCRUM-61) y presentación final (SCRUM-37).
+- [ ] **Entrega** — Pipeline (SCRUM-38, probado en Windows), informe parte 2
+  (SCRUM-61) y presentación final (SCRUM-37).
 
 Estado del backlog consultado el **11/11/2026**. Los datos y métricas
 versionados no prueban por sí solos la finalización de los tickets pendientes.
