@@ -12,7 +12,10 @@ Un solo comando que deja la estimación del mes, su explicación y el registro:
 6. Calcula las contribuciones de cada estimación (SCRUM-35).
 7. Agrega la estimación al registro con la variación del IACA que se
    publicaría (SCRUM-44) y las contribuciones a
-   ``data/registro_contribuciones.csv``.
+   ``data/registro_contribuciones.csv`` (solo las del modelo final, sin la
+   fila ``total``). Antes de escribir valida todo, incluido que los aportes
+   sumen el pronóstico del registro; si algo no cierra no escribe ninguno de
+   los dos archivos.
 
 Salida: el registro (``data/registro_estimaciones.csv``), las contribuciones
 (``data/registro_contribuciones.csv``) y un resumen en pantalla. Los informes
@@ -53,7 +56,7 @@ from build_db import leer_dataset  # noqa: E402
 from construir_features import OBJETIVOS  # noqa: E402
 from contribuciones import explicar  # noqa: E402
 
-RUTA_CONTRIBUCIONES = RAIZ / "data" / "registro_contribuciones.csv"
+RUTA_CONTRIBUCIONES = registro.RUTA_CONTRIBUCIONES
 RUTA_ELECCION = RAIZ / "results" / "comparacion_final_eleccion.csv"
 CARPETA_SIMULACION = RAIZ / "results" / "simulacion"
 CARPETA_INDEC = RAIZ / "variables_externas" / "data" / "indec_biodiesel"
@@ -79,9 +82,6 @@ DESCARGAS = [
     ("ventas de gasoil y nafta", ["variables_externas/descargar_combustibles.py", "--output", "variables_externas/data"]),
     ("aceite de soja y azúcar", ["variables_externas/descargar_aceite_soja.py"]),
 ]
-
-COLUMNAS_CONTRIBUCIONES = ["estimacion_id", "serie_id", "mes_estimado", "modelo_elegido", "factor",
-                           "aporte", "aporte_variacion_produccion_pp", "nota"]
 
 
 # ------------------------------------------------------------------ pasos
@@ -171,44 +171,24 @@ def estimar(mes: pd.Period, base: pd.DataFrame, elegidos: dict[str, str]) -> dic
     return salida
 
 
-def guardar_contribuciones(tablas: dict[str, pd.DataFrame], ids: dict[str, int],
-                           elegidos: dict[str, str], ruta: Path) -> pd.DataFrame:
-    """Agrega las contribuciones al CSV, unidas al registro por ``estimacion_id``.
+def armar_contribuciones(tablas: dict[str, pd.DataFrame], ids: dict[str, int]) -> pd.DataFrame:
+    """Contribuciones a guardar, unidas al registro por ``estimacion_id``.
 
-    Igual que el registro: solo se agregan filas y se controla que las
-    anteriores no cambiaron.
+    Una fila por factor de la estimación del modelo final de cada serie. La
+    fila ``total`` no se guarda: es la suma de las demás. No escribe nada; la
+    validación y la escritura las hace ``registro.agregar``.
     """
-    nuevas = []
+    partes = []
     for serie, t in tablas.items():
-        t = t.rename(columns={"modelo": "_"})
-        nuevas.append(pd.DataFrame({
+        cuerpo = t[t["factor"] != "total"]
+        partes.append(pd.DataFrame({
             "estimacion_id": ids[serie],
-            "serie_id": OBJETIVOS[serie],
-            "mes_estimado": pd.Period(t["fecha"].iloc[0], freq="M").to_timestamp().strftime("%Y-%m-%d"),
-            "modelo_elegido": elegidos[serie],
-            "factor": t["factor"],
-            "aporte": t["aporte"],
-            "aporte_variacion_produccion_pp": t["aporte_variacion_produccion_pp"],
-            "nota": t["nota"].fillna(""),
+            "factor": cuerpo["factor"].to_numpy(),
+            "aporte": cuerpo["aporte"].to_numpy(dtype=float),
+            "aporte_variacion_produccion_pp": cuerpo["aporte_variacion_produccion_pp"].to_numpy(dtype=float),
+            "nota": cuerpo["nota"].fillna("").to_numpy() if "nota" in cuerpo else "",
         }))
-    nuevas = pd.concat(nuevas, ignore_index=True)[COLUMNAS_CONTRIBUCIONES]
-    if ruta.exists():
-        anterior = pd.read_csv(ruta, keep_default_na=False, float_precision="round_trip")
-        if set(nuevas["estimacion_id"]) & set(anterior["estimacion_id"]):
-            raise RuntimeError("Ya hay contribuciones para esas estimaciones.")
-        todo = pd.concat([anterior, nuevas], ignore_index=True)
-    else:
-        anterior, todo = None, nuevas
-    ruta.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ruta.with_suffix(".tmp")
-    todo.to_csv(tmp, index=False)
-    if anterior is not None:
-        releido = pd.read_csv(tmp, keep_default_na=False, float_precision="round_trip").iloc[:len(anterior)]
-        if not releido.equals(anterior):
-            tmp.unlink()
-            raise RuntimeError("Se modificarían contribuciones ya guardadas; no se escribió nada.")
-    os.replace(tmp, ruta)
-    return nuevas
+    return pd.concat(partes, ignore_index=True)[registro.COLUMNAS_CONTRIBUCIONES]
 
 
 # ------------------------------------------------------------------ corrida
@@ -265,26 +245,34 @@ def correr(sin_descargas: bool = False, simular: str | None = None) -> dict:
     tablas = estimar(mes, base, elegidos)
 
     print("\n6. Registro y variación del IACA (corre X-13, ~30 s por serie)")
+    # Primero se arman todas las filas (registro y contribuciones) sin escribir;
+    # registro.agregar valida todo junto y recién después escribe los dos CSV.
     filas, ids = [], {}
+    acumulado = registro.leer_registro(ruta_registro)
     for serie in SERIES:
-        nuevas = registro.registrar(
+        nuevas = registro.preparar(
             serie, mes, "modelo_final", tablas[serie].attrs["prediccion"],
             {"modelo_elegido": elegidos[serie]},
-            ruta=ruta_registro, ruta_db=ruta_db,
+            anterior=acumulado, ruta_db=ruta_db,
             produccion=None if produccion is None else {serie: produccion[serie]},
             fecha_descarga_datos=fecha_datos,
         )
         ids[serie] = int(nuevas.loc[nuevas["modelo"] == "modelo_final", "estimacion_id"].iloc[0])
         filas.append(nuevas)
+        acumulado = pd.concat([acumulado, nuevas], ignore_index=True) if len(acumulado) else nuevas
     filas = pd.concat(filas, ignore_index=True)
-    guardar_contribuciones(tablas, ids, elegidos, ruta_contrib)
-    print(f"  ok    {len(filas)} filas en el registro y contribuciones guardadas")
+    contribuciones = armar_contribuciones(tablas, ids)
+    registro.agregar(filas, contribuciones, ruta=ruta_registro, ruta_contribuciones=ruta_contrib,
+                     ruta_db=ruta_db)
+    print(f"  ok    {len(filas)} filas en el registro y {len(contribuciones)} contribuciones guardadas "
+          "(los aportes suman el pronóstico)")
 
     print()
     _imprimir_resumen(tablas, filas, reales)
     return {
         "mes": mes, "tablas": tablas, "filas": filas, "reales": reales, "simulacion": bool(simular),
-        "elegidos": elegidos, "ruta_registro": ruta_registro, "ruta_contribuciones": ruta_contrib,
+        "elegidos": elegidos, "contribuciones": contribuciones,
+        "ruta_registro": ruta_registro, "ruta_contribuciones": ruta_contrib,
         "base": base_completa if simular else base,
     }
 

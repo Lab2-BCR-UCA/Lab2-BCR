@@ -373,7 +373,8 @@ def reconstruir(raiz: Path, ruta_db: Path) -> dict:
         if insumos and not errores:
             _cargar_derivadas(con, series, insumos, errores, avisos)
 
-        # Registro de estimaciones (SCRUM-44): se copia desde su CSV.
+        # Registro de estimaciones (SCRUM-44) y sus contribuciones (SCRUM-38):
+        # se copian desde sus CSV.
         if not errores:
             _cargar_registro(con, raiz, errores)
 
@@ -550,6 +551,37 @@ def _cargar_registro(con: sqlite3.Connection, raiz: Path, errores: list[str]) ->
         con.executemany(f"INSERT INTO registro_estimaciones VALUES ({', '.join('?' * len(columnas))})", filas)
     except sqlite3.IntegrityError as e:
         errores.append(f"{ruta.name}: {e}")
+        return
+    _cargar_contribuciones(con, raiz, errores)
+
+
+def _cargar_contribuciones(con: sqlite3.Connection, raiz: Path, errores: list[str]) -> None:
+    """Carga data/registro_contribuciones.csv en su tabla (SCRUM-38).
+
+    Igual que el registro: el CSV es la fuente de verdad (lo escribe
+    scripts/registro.py, que controla que los aportes sumen el pronóstico) y
+    la tabla se rehace en cada armado. Cada estimacion_id tiene que estar en
+    el registro.
+    """
+    ruta = raiz / "data" / "registro_contribuciones.csv"
+    if not ruta.exists():
+        return
+    columnas = [c[1] for c in con.execute("PRAGMA table_info(registro_contribuciones)")]
+    df = pd.read_csv(ruta, dtype=str, keep_default_na=False)
+    if list(df.columns) != columnas:
+        errores.append(f"{ruta.name}: las columnas no coinciden con la tabla registro_contribuciones")
+        return
+    filas = [tuple(None if (v == "" and c != "nota") else v for c, v in zip(columnas, fila))
+             for fila in df.itertuples(index=False)]
+    try:
+        con.executemany(f"INSERT INTO registro_contribuciones VALUES ({', '.join('?' * len(columnas))})",
+                        filas)
+    except sqlite3.IntegrityError as e:
+        errores.append(f"{ruta.name}: {e}")
+        return
+    huerfanas = con.execute("PRAGMA foreign_key_check(registro_contribuciones)").fetchall()
+    if huerfanas:
+        errores.append(f"{ruta.name}: {len(huerfanas)} filas con un estimacion_id que no está en el registro")
 
 
 # ----------------------------------------------------------------- lectura

@@ -123,12 +123,20 @@ def test_controles(ruta: Path) -> None:
     _falla(lambda: registro._controlar_solo_agrega(df, cambiada), RuntimeError, "valor_real")
 
 
+def _contribuciones(ruta: Path, estimacion_id: int, pronostico: float) -> None:
+    """Escribe a mano (sin validar) contribuciones de una estimación que suman su pronóstico."""
+    pd.DataFrame({"estimacion_id": estimacion_id, "factor": ["constante", "exportaciones"],
+                  "aporte": [pronostico - 1000.0, 1000.0], "aporte_variacion_produccion_pp": [0.0, 1.5],
+                  "nota": ["", "estimado"]}).to_csv(registro.ruta_contribuciones_de(ruta), index=False)
+
+
 def test_base_y_excel(tmp: Path) -> None:
-    """build_db carga el CSV del registro; registro.py mantiene la tabla al día; el Excel sale."""
+    """build_db carga los CSV del registro y de las contribuciones; registro.py mantiene las tablas al día; el Excel sale."""
     raiz = tmp / "repo"
     _copiar_repo(raiz)
     ruta = raiz / "data" / "registro_estimaciones.csv"
     _registrar(ruta)
+    _contribuciones(ruta, 1, 100000.0)
     db = raiz / "data" / "bcr.db"
     build_db.actualizar(raiz, db, "2026-11-11")
 
@@ -142,10 +150,21 @@ def test_base_y_excel(tmp: Path) -> None:
     t = tabla()
     assert len(t) == 2 and list(t.columns) == registro.COLUMNAS
     assert t["pronostico"].tolist() == registro.leer_registro(ruta)["pronostico"].tolist()
+    con = sqlite3.connect(db)
+    try:
+        c = pd.read_sql("SELECT * FROM registro_contribuciones ORDER BY factor", con)
+    finally:
+        con.close()
+    assert list(c.columns) == registro.COLUMNAS_CONTRIBUCIONES and c["aporte"].sum() == 100000.0
 
     # Al completar con la base indicada, la tabla se actualiza sin rearmar.
     registro.completar(ruta=ruta, ruta_db=db, reales=_reales())
     assert tabla()["valor_real"].notna().all()
+
+    # Contribuciones de una estimación que no está en el registro hacen fallar el armado.
+    _contribuciones(ruta, 99, 1.0)
+    _falla(lambda: build_db.reconstruir(raiz, db), ValueError, "registro_contribuciones")
+    _contribuciones(ruta, 1, 100000.0)
 
     # Un CSV con una serie que no existe hace fallar el armado.
     df = registro.leer_registro(ruta)
@@ -153,19 +172,28 @@ def test_base_y_excel(tmp: Path) -> None:
     df.to_csv(ruta, index=False)
     _falla(lambda: build_db.reconstruir(raiz, db), ValueError, "registro_estimaciones")
 
-    # Excel con las tres hojas. El mes se corrió dos veces: en "registro" están
+    # Excel con las cuatro hojas. El mes se corrió dos veces: en "registro" están
     # las dos corridas y en "ultima_por_mes" solo la última.
     ruta.unlink()
     _registrar(ruta, pronostico=100000.0)
     _registrar(ruta, pronostico=105000.0, fecha_corrida="2025-10-21 09:00:00")
+    _contribuciones(ruta, 3, 105000.0)
     salida = registro.exportar_excel(ruta, tmp / "registro.xlsx")
     hojas = pd.read_excel(salida, sheet_name=None)
-    assert list(hojas) == ["ultima_por_mes", "registro", "columnas"]
+    assert list(hojas) == ["ultima_por_mes", "registro", "contribuciones", "columnas"]
     assert len(hojas["registro"]) == 4
     ultima = hojas["ultima_por_mes"]
     assert len(ultima) == 2 and (ultima["fecha_corrida"] == "2025-10-21 09:00:00").all()
     assert ultima.loc[ultima["modelo"] == "modelo_final", "pronostico"].tolist() == [105000.0]
-    assert set(hojas["columnas"]["columna"]) == set(registro.COLUMNAS)
+    columnas = hojas["columnas"]
+    assert set(columnas.loc[columnas["hoja"] != "contribuciones", "columna"]) == set(registro.COLUMNAS)
+    # Contribuciones: el aviso de que los puntos son de producción y la tabla abajo.
+    aviso = pd.read_excel(salida, sheet_name="contribuciones", header=None, nrows=1).iloc[0, 0]
+    assert "PRODUCCIÓN" in aviso and "No son puntos de la variación del IACA" in aviso
+    contrib = pd.read_excel(salida, sheet_name="contribuciones", header=registro.FILA_TABLA_CONTRIBUCIONES)
+    assert list(contrib.columns) == list(registro.DESCRIPCIONES_CONTRIBUCIONES)
+    assert contrib["aporte"].sum() == 105000.0 and (contrib["estimacion_id"] == 3).all()
+    assert (contrib["serie_id"] == "produccion_biodiesel_tn").all()
 
 
 def test_primer_dato_publicado(tmp: Path) -> None:

@@ -5,7 +5,9 @@
   la variación del IACA contra ``results/iaca_holdout_detalle.csv``. Si
   coinciden, el pipeline estima igual que el modelo que se evaluó.
 - Controla que frene si faltan las ventas de gasoil o las exportaciones del mes.
-- Controla que las contribuciones solo se agreguen.
+- Controla las contribuciones: solo las del modelo final, sin la fila
+  ``total``, que sumen el pronóstico del registro, que solo se agreguen y que
+  si algo no cierra no se escriba ninguno de los dos archivos.
 
 Corre X-13 (dos series por mes): tarda alrededor de un minuto y medio.
 
@@ -24,6 +26,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pipeline  # noqa: E402
+import registro  # noqa: E402
 from build_db import leer_dataset  # noqa: E402
 from construir_features import OBJETIVOS  # noqa: E402
 
@@ -50,10 +53,13 @@ def test_simulacion_coincide_con_la_evaluacion():
                 assert np.isclose(fila["pronostico"], e["produccion_pronosticada"].iloc[0], rtol=1e-9)
                 assert np.isclose(fila["variacion_pronosticada_pct"], e["variacion_pronosticada_pct"].iloc[0],
                                   atol=1e-9), (mes, serie, fila["modelo"])
-        contrib = pd.read_csv(pipeline.CARPETA_SIMULACION / f"contribuciones_{mes}.csv", keep_default_na=False)
-        total = contrib[contrib["factor"] == "total"].set_index("estimacion_id")["aporte"]
+        contrib = registro.leer_contribuciones(pipeline.CARPETA_SIMULACION / f"contribuciones_{mes}.csv")
+        assert list(contrib.columns) == registro.COLUMNAS_CONTRIBUCIONES
+        assert "total" not in set(contrib["factor"]), mes
         final = reg[reg["modelo"] == "modelo_final"].set_index("estimacion_id")["pronostico"]
-        assert np.allclose(total.loc[final.index], final, rtol=1e-9), mes
+        suma = contrib.groupby(contrib["estimacion_id"].astype(int))["aporte"].sum()
+        assert sorted(suma.index) == sorted(final.index), (mes, "solo y todas las del modelo final")
+        assert np.allclose(suma.loc[final.index], final, rtol=1e-9), mes
         oculto = contrib[(contrib["factor"] == "exportaciones") & (contrib["nota"] != "")]
         assert (len(oculto) > 0) == (mes == "2026-07"), (mes, "aviso de exportaciones estimadas")
     print(f"ok  la simulación da el mismo pronóstico y la misma variación del IACA que la evaluación "
@@ -72,31 +78,78 @@ def test_frena_si_faltan_datos_del_mes():
     print("ok  frena si todavía no están las ventas de gasoil o las exportaciones del mes")
 
 
-def test_contribuciones_solo_se_agregan():
-    tabla = pd.DataFrame({"fecha": "2026-09", "modelo": "suma_contable", "factor": ["a", "total"],
-                          "aporte": [1.0, 1.0], "aporte_variacion_produccion_pp": [0.5, 0.5],
-                          "nota": ["", ""]})
+def _falla(funcion, texto: str) -> None:
+    try:
+        funcion()
+    except (ValueError, RuntimeError) as e:
+        assert texto in str(e), f"mensaje inesperado: {e}"
+    else:
+        raise AssertionError(f"tenía que fallar ({texto})")
+
+
+def test_contribuciones():
+    """registro.agregar: valida todo antes de escribir y solo agrega. Sin X-13 (maíz no va al IACA)."""
+    serie = "bioetanol_maiz"
+    produccion = {serie: pd.Series([10.0, 11.0], index=pd.period_range("2026-07", periods=2, freq="M"))}
+
+    def preparar(mes, pronostico, anterior, modelo="modelo_final"):
+        corrida = f"2026-11-11 10:00:{len(anterior) if anterior is not None else 0:02d}"
+        return registro.preparar(serie, mes, modelo, pronostico, anterior=anterior, ruta_db=None,
+                                 produccion=produccion, fecha_descarga_datos="2026-11-11",
+                                 fecha_corrida=corrida)
+
+    def tabla(i, aportes, factores=None):
+        factores = factores or [f"f{k}" for k in range(len(aportes))]
+        return pd.DataFrame({"estimacion_id": i, "factor": factores, "aporte": aportes,
+                             "aporte_variacion_produccion_pp": [1.0] * len(aportes),
+                             "nota": [""] * len(aportes)})
+
     with tempfile.TemporaryDirectory() as tmp:
-        ruta = Path(tmp) / "c.csv"
-        pipeline.guardar_contribuciones({"biodiesel": tabla}, {"biodiesel": 1},
-                                        {"biodiesel": "suma_contable"}, ruta)
-        pipeline.guardar_contribuciones({"biodiesel": tabla}, {"biodiesel": 2},
-                                        {"biodiesel": "suma_contable"}, ruta)
-        assert list(pd.read_csv(ruta)["estimacion_id"]) == [1, 1, 2, 2]
-        antes = ruta.read_bytes()
-        try:
-            pipeline.guardar_contribuciones({"biodiesel": tabla}, {"biodiesel": 2},
-                                            {"biodiesel": "suma_contable"}, ruta)
-        except RuntimeError:
-            pass
-        else:
-            raise AssertionError("debió frenar por estimación repetida")
-        assert ruta.read_bytes() == antes
-    print("ok  las contribuciones solo se agregan y no se repiten")
+        ruta = Path(tmp) / "registro_estimaciones.csv"
+        ruta_c = Path(tmp) / "registro_contribuciones.csv"
+        nuevas = preparar("2026-09", 100.0, None)
+        registro.agregar(nuevas, tabla(1, [60.0, 40.0]), ruta=ruta, ruta_db=None)
+        assert ruta_c.exists(), "las contribuciones van al lado del registro"
+        assert list(registro.leer_contribuciones(ruta_c)["aporte"]) == [60.0, 40.0]
+        antes = (ruta.read_bytes(), ruta_c.read_bytes())
+
+        def sin_cambios():
+            assert (ruta.read_bytes(), ruta_c.read_bytes()) == antes, "no tenía que escribir nada"
+            assert not ruta.with_suffix(".tmp").exists() and not ruta_c.with_suffix(".tmp").exists()
+
+        anterior = registro.leer_registro(ruta)
+        otra = preparar("2026-09", 200.0, anterior)  # segunda corrida del mismo mes: id 2
+        casos = [
+            ("no suman el pronóstico", tabla(2, [150.0, 40.0])),
+            ("'total'", tabla(2, [150.0, 50.0, 200.0], ["a", "b", "total"])),
+            ("repetidos", tabla(2, [150.0, 50.0], ["a", "a"])),
+            ("no están en el registro", tabla(3, [200.0])),
+            ("Faltan o sobran", pd.concat([tabla(2, [200.0]), tabla(1, [100.0])], ignore_index=True)),
+            ("vacíos", tabla(2, [200.0, float("nan")])),
+        ]
+        for texto, contrib in casos:
+            _falla(lambda: registro.agregar(otra, contrib, ruta=ruta, ruta_db=None), texto)
+            sin_cambios()
+        # Una fila que no es del modelo final no lleva contribuciones.
+        x13 = preparar("2026-09", 300.0, anterior, modelo="x13_bcr")
+        _falla(lambda: registro.agregar(x13, tabla(2, [300.0]), ruta=ruta, ruta_db=None), "modelo final")
+        sin_cambios()
+        # La misma estimación dos veces.
+        _falla(lambda: registro.agregar(nuevas, tabla(1, [100.0]), ruta=ruta, ruta_db=None), "ya están")
+        sin_cambios()
+
+        # La corrida válida se agrega sin tocar lo anterior.
+        registro.agregar(otra, tabla(2, [150.0, 50.0]), ruta=ruta, ruta_db=None)
+        assert ruta.read_bytes().startswith(antes[0])
+        c = registro.leer_contribuciones(ruta_c)
+        assert list(c["estimacion_id"]) == [1, 1, 2, 2] and list(c["aporte"]) == [60.0, 40.0, 150.0, 50.0]
+        assert ruta_c.read_bytes().startswith(antes[1])
+    print("ok  contribuciones: solo modelo final, sin 'total', suman el pronóstico, solo se agregan "
+          "y si algo falla no se escribe ningún archivo")
 
 
 if __name__ == "__main__":
     test_frena_si_faltan_datos_del_mes()
-    test_contribuciones_solo_se_agregan()
+    test_contribuciones()
     test_simulacion_coincide_con_la_evaluacion()
     print("\nTodas las pruebas del pipeline pasaron.")

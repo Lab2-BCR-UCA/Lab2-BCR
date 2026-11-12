@@ -24,7 +24,10 @@ Un solo comando deja la estimación del mes, su explicación y el registro:
 6. **Contribuciones**: qué factores explican cada estimación (SCRUM-35).
 7. **Registro**: agrega cada estimación con la variación del IACA que se
    publicaría (y la réplica del X-13 BCR para comparar), y sus contribuciones
-   en `data/registro_contribuciones.csv`.
+   en `data/registro_contribuciones.csv`. Antes de escribir valida todo junto
+   (ver la sección 3); si algo no cierra, no escribe ninguno de los dos
+   archivos.
+
 Salida: el registro, las contribuciones y un resumen en pantalla con la
 estimación, la variación del IACA y los tres factores que más pesan en cada
 serie. Los informes para la BCR (Excel y HTML) salen de lo que devuelve
@@ -55,11 +58,29 @@ registro real: escribe en `results/simulacion/`.
 | Archivo | Qué es | ¿Se versiona? |
 |---|---|---|
 | `data/registro_estimaciones.csv` | Registro de estimaciones (SCRUM-44) | Sí |
-| `data/registro_contribuciones.csv` | Contribuciones de cada estimación, una fila por factor, unidas por `estimacion_id` | Sí |
+| `data/registro_contribuciones.csv` | Contribuciones de cada estimación del modelo final, una fila por factor, unidas por `estimacion_id` | Sí |
 | `results/simulacion/` | Simulaciones | No |
 
-Las contribuciones siguen las mismas reglas que el registro: solo se agregan
-filas y antes de escribir se controla que las anteriores no cambiaron.
+**Contribuciones.** Columnas: `estimacion_id`, `factor`, `aporte` (tn o m³),
+`aporte_variacion_produccion_pp` y `nota`. La serie y el mes salen del
+registro por `estimacion_id`. Los puntos son de variación de la **producción**
+contra el real del mes anterior, sin desestacionalizar: **no son puntos del
+IACA**.
+
+Siguen las mismas reglas que el registro (solo se agregan filas) y además,
+antes de escribir los dos CSV, `registro.agregar` controla que:
+
+- solo haya contribuciones de las estimaciones del modelo final de esta
+  corrida, todas y ninguna de más (la fila del X-13 BCR no lleva);
+- no esté la fila `total` (es la suma de las demás) ni factores repetidos;
+- no haya vacíos ni valores no numéricos;
+- los aportes de cada estimación sumen el pronóstico del registro;
+- las filas anteriores de los dos archivos no cambien.
+
+Escribe los dos en temporales, los vuelve a leer y controlar, y recién ahí los
+reemplaza. La base las carga en la tabla `registro_contribuciones` y el Excel
+del registro (`python scripts/registro.py exportar`) las trae en la hoja
+"contribuciones", con la aclaración de que los puntos son de producción.
 
 En la PC de la BCR el registro vive en la carpeta `data/` del proyecto. Como
 ahí no se commitea, **conviene copiar los dos CSV del registro a un lugar con
