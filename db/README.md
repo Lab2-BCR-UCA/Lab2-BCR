@@ -67,6 +67,8 @@ fuentes ──< series ──< observaciones >── descargas >── fuentes
               └──< series_insumos              └──< descargas_insumos
 ```
 
+`registro_contribuciones` cuelga de `registro_estimaciones` (`estimacion_id`).
+
 | Tabla | Una fila por | Clave | Contenido |
 |---|---|---|---|
 | `fuentes` | archivo CSV de origen | `fuente` | Ruta y descripción. Sale de `db/fuentes.csv`. |
@@ -76,6 +78,7 @@ fuentes ──< series ──< observaciones >── descargas >── fuentes
 | `descargas_insumos` | insumo usado por una versión de una derivada | `descarga_id` + `insumo_descarga_id` | Linaje: con qué descargas de los insumos se calculó cada versión. |
 | `observaciones` | serie, mes y versión | `serie_id` + `fecha` + `descarga_id` | El valor y, en producción, si era provisorio en esa versión. |
 | `registro_estimaciones` | estimación de un modelo | `estimacion_id` | Copia de `data/registro_estimaciones.csv` (SCRUM-44), que es la fuente de verdad porque la base se rearma de cero: el armado la carga y `scripts/registro.py` la actualiza. Pronóstico, modelo, configuración, versión de los datos, variación del IACA que se publicaría y, cuando se publica, el real y los errores. Ver `docs/registro.md`. |
+| `registro_contribuciones` | factor de una estimación del modelo final | `estimacion_id` + `factor` | Copia de `data/registro_contribuciones.csv` (SCRUM-38), con la misma regla de solo agregar. Aporte de cada factor en tn o m³ (suman el pronóstico de la estimación) y en puntos de variación de la **producción** (no del IACA). No guarda la fila `total`. |
 
 Vistas:
 

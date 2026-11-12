@@ -52,8 +52,14 @@ al IACA por separado.
 - `build_db.py` copia el CSV a la tabla `registro_estimaciones` en cada
   armado, y `registro.py` actualiza la tabla cada vez que escribe el CSV. Así
   se puede consultar con SQL junto con el resto de los datos.
+- **`data/registro_contribuciones.csv`** (SCRUM-38) guarda al lado del
+  registro las contribuciones de cada estimación del modelo final: una fila
+  por factor, unida por `estimacion_id`, sin la fila `total`. Se versiona igual
+  que el registro y `build_db.py` la carga en la tabla
+  `registro_contribuciones`. La escribe el pipeline con `agregar` (ver
+  `docs/pipeline.md`).
 - `results/registro_estimaciones.xlsx` es la exportación para la BCR. No se
-  versiona: se genera desde el CSV.
+  versiona: se genera desde los CSV.
 
 ## 4. Reglas
 
@@ -101,12 +107,17 @@ registrar("bioetanol_total", "2026-10", "modelo_final", 150000.0, {"modelo_elegi
 exportar_excel()
 ```
 
-Orden recomendado en el pipeline: armar la base → `completar()` → estimar →
-`registrar()` → `exportar_excel()` → commitear `data/registro_estimaciones.csv`.
+`registrar()` guarda solo la estimación. El pipeline (SCRUM-38) la guarda
+junto con sus contribuciones: arma las filas con `preparar()` y las escribe con
+`agregar(filas, contribuciones)`, que valida el registro y las contribuciones
+juntos (incluido que los aportes sumen el pronóstico) y escribe los dos CSV o
+ninguno.
 
-El Excel tiene tres hojas: `ultima_por_mes`, con la última estimación de cada
-mes (la que se usa para medir el error), `registro`, con todas las corridas, y
-`columnas`, con qué es cada columna.
+El Excel tiene cuatro hojas: `ultima_por_mes`, con la última estimación de
+cada mes (la que se usa para medir el error), `registro`, con todas las
+corridas, `contribuciones`, con los factores de cada estimación del modelo
+final, y `columnas`, con qué es cada columna. La hoja de contribuciones aclara
+arriba que los puntos son de variación de la producción, no del IACA.
 
 ## 6. Verificación
 
@@ -129,8 +140,9 @@ misma del protocolo. El registro simulado queda en
 Son los mismos números de `results/iaca_holdout_metricas.csv`.
 
 `python scripts/test_registro.py` prueba las reglas de la sección 4 (incluido
-que un dato revisado no cambie el real ya publicado), la carga en la base, el
-Excel y los mensajes de error, sin correr X-13.
+que un dato revisado no cambie el real ya publicado), la carga en la base del
+registro y de las contribuciones, el Excel y los mensajes de error, sin correr
+X-13. Los controles de las contribuciones están en `scripts/test_pipeline.py`.
 
 ## 7. Cambio en `error_iaca.py`
 

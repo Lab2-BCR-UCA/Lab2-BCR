@@ -117,6 +117,21 @@ CREATE TABLE registro_estimaciones (
     UNIQUE (serie_id, mes_estimado, modelo, fecha_corrida)
 );
 
+-- Contribuciones de cada estimación del modelo final (SCRUM-38). La fuente de
+-- verdad es data/registro_contribuciones.csv, que se versiona igual que el
+-- registro: build_db.py lo carga acá y scripts/registro.py lo actualiza. Una
+-- fila por factor, unida al registro por estimacion_id. Solo se agregan filas
+-- y no se guarda la fila "total": los aportes de una estimación suman su
+-- pronóstico (lo controla scripts/registro.py antes de escribir).
+CREATE TABLE registro_contribuciones (
+    estimacion_id                  INTEGER NOT NULL REFERENCES registro_estimaciones(estimacion_id),
+    factor                         TEXT NOT NULL CHECK (factor <> 'total'),
+    aporte                         REAL NOT NULL,   -- tn o m³
+    aporte_variacion_produccion_pp REAL NOT NULL,   -- puntos de variación de la PRODUCCIÓN, no del IACA
+    nota                           TEXT,
+    PRIMARY KEY (estimacion_id, factor)
+);
+
 -- Última versión disponible de cada dato.
 CREATE VIEW v_ultima_version AS
 SELECT serie_id, fecha, valor, provisorio, fecha_descarga, descarga_id
