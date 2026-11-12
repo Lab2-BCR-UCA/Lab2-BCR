@@ -24,3 +24,10 @@ data/registro_estimaciones.tmp
 # Simulaciones del pipeline (SCRUM-38): son para probar o mostrar.
 results/simulacion/
 data/registro_contribuciones.tmp
+
+# Salida mensual (SCRUM-64): Excel, HTML y JSON de cada mes, simulaciones y respaldos.
+# Se regeneran o quedan en la PC de la BCR; no se versionan.
+resultados/
+
+# Entorno de Python que crea instalar.bat
+.venv/

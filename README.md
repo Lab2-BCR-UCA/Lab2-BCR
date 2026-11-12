@@ -223,6 +223,20 @@ python scripts/pipeline.py --simular 2026-09  # demo con un mes ya publicado (no
 python scripts/test_pipeline.py               # pruebas (~2 min, corre X-13)
 ```
 
+## Salida mensual para la BCR (SCRUM-64)
+
+En Windows: doble clic en `instalar.bat` la primera vez y, cada mes desde el
+día 28, doble clic en `correr_estimacion.bat`. Deja en `resultados/` el Excel
+`IACA_biocombustibles_AAAA-MM.xlsx` y el informe `estimacion_AAAA-MM.html`
+(se abre solo), ambos armados desde los mismos datos, y una copia de respaldo
+de la base y del registro. Instalación, qué trae cada archivo, qué hacer si
+falla y cómo restaurar un respaldo: [`docs/salida_mensual.md`](docs/salida_mensual.md).
+
+```bash
+python scripts/salida_mensual.py --simular 2026-09   # demo con un mes ya publicado
+python scripts/test_salida_mensual.py                # pruebas (~1 min)
+```
+
 ## Registro de estimaciones (SCRUM-44)
 
 Cada estimación mensual se guarda en `data/registro_estimaciones.csv` (solo se
