@@ -50,7 +50,8 @@ estimar sin ellas. Las ventas de gasoil salen los días 25-27 del mes siguiente
 y las exportaciones de INDEC alrededor del día 20, así que la corrida mensual
 va desde el 28.
 
-Cuando frena por eso (antes del 28 o porque faltan esos datos) termina con
+Cuando frena por eso (antes del 28, porque faltan esos datos o porque el sitio
+de la producción no responde) termina con
 `NO SE ESTIMÓ (no es un error)` y código de salida 0: no hay nada roto, hay que
 volver a correr más tarde. Los errores de verdad terminan con `ERROR` y código 1.
 
@@ -114,6 +115,20 @@ respaldo** después de cada corrida.
 - las contribuciones suman el pronóstico y el aviso de exportación estimada
   aparece solo en julio.
 
+**Con qué datos.** La simulación no usa `data/bcr.db`, que cambia con cada
+descarga: arma aparte, en `results/simulacion/base_evaluacion/` (no se
+versiona), una base solo con las copias de
+`data/snapshots/` hasta el **05/11/2026** (`FECHA_DATOS_EVALUACION` en la
+prueba), que es la versión de los datos con que se corrió la evaluación. Así da
+lo mismo en cualquier clon del repo, aunque antes se hayan bajado datos nuevos
+(por ejemplo, una pizarra de la CAC más nueva cambia apenas el bioetanol de
+maíz). Lo único que necesita es `data/snapshots/` completo, como está en el
+repo; si falta alguna copia, lo dice. No toca la base ni el registro.
+
+Si la prueba falla, el mensaje dice qué número no coincide. Las causas
+posibles son un cambio en el código de un modelo, o que se rehízo la
+evaluación con datos más nuevos y hay que actualizar `FECHA_DATOS_EVALUACION`.
+
 También prueba que frene si faltan gasoil o exportaciones del mes, y que las
 contribuciones no se repitan ni se pisen.
 
@@ -134,7 +149,8 @@ BCR publicaría con su máquina.
 
 | Mensaje | Qué hacer |
 |---|---|
-| `FALLÓ <fuente>: el sitio no responde` | No es un error del programa: el sitio está caído o no contesta (ya se reintentó 3 veces). Sigue con los datos anteriores de esa fuente. Si es la producción frena, porque sin ella no se sabe qué mes estimar: esperar unas horas y volver a correr. Si el caído es el sitio de la Secretaría de Energía (energia.gob.ar), el portal datos.energia.gob.ar no sirve de alternativa porque baja del mismo servidor. |
+| `FALLÓ <fuente>: el sitio no responde` | No es un error del programa: el sitio está caído o no contesta (ya se reintentó 3 veces). Sigue con los datos anteriores de esa fuente. Si es la producción, termina con `NO SE ESTIMÓ (no es un error): El sitio de la Secretaría de Energía no responde…`, porque sin ella no se sabe qué mes estimar: esperar unas horas y volver a correr. El portal datos.energia.gob.ar no sirve de alternativa porque baja del mismo servidor. |
+| `ERROR: No se pudo descargar la producción…` | La producción falló por otra causa (por ejemplo, cambió el archivo de la Secretaría). Pasarle el mensaje al equipo. |
 | `FALLÓ <fuente>: <otro mensaje>` | Puede ser un cambio en el archivo de la fuente. Pasarle el mensaje al equipo. |
 | `Todavía no se puede estimar <mes>. Volver a correr desde el <fecha>` | Es antes del 28 del mes siguiente. Igual se completaron los reales; volver a correr desde esa fecha. |
 | `aviso INDEC todavía no publicó` | INDEC publica alrededor del día 20 del mes siguiente. Esperar. |

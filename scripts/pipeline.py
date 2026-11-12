@@ -5,6 +5,9 @@ Un solo comando que deja la estimación del mes, su explicación y el registro:
 1. Descarga los datos públicos. Cada fuente se reintenta hasta 3 veces; si
    sigue sin responder, avisa y sigue con los datos anteriores (si es la
    producción, frena: sin ella no se sabe qué mes estimar).
+   Si la producción no se puede bajar porque el sitio no responde, termina con
+   «NO SE ESTIMÓ» (no es un error del programa); si falla por otra causa, con
+   «ERROR».
    Si todavía no es el día 28 del mes siguiente al mes a estimar, avisa en ese
    momento que no se puede estimar y desde qué fecha volver a correr; igual
    arma la base y completa los reales (pasos 3 y 4) antes de terminar.
@@ -99,8 +102,15 @@ SIN_RESPUESTA = re.compile(
     r"Bad Gateway|Service Unavailable|Gateway Time-?out", re.IGNORECASE)
 
 
+SITIO_CAIDO = "el sitio no responde"
+
+
 class TodaviaNoSePuedeEstimar(RuntimeError):
-    """Faltan datos del mes que todavía no se publicaron. No es un error: volver a correr más tarde."""
+    """No se puede estimar todavía y no es un error del programa: volver a correr más tarde.
+
+    Pasa antes del día 28, cuando faltan las ventas de gasoil o las
+    exportaciones del mes, o cuando el sitio de la producción no responde.
+    """
 
 
 DESCARGAS = [
@@ -143,16 +153,19 @@ def _descargar_una(nombre: str, script: list[str]) -> tuple[bool, str]:
                   f"se reintenta en {pausa} s", flush=True)
             time.sleep(pausa)
     if _sin_respuesta(ultima):
-        return False, (f"el sitio no responde (se probó {intentos} veces). No es un error del "
+        return False, (f"{SITIO_CAIDO} (se probó {intentos} veces). No es un error del "
                        "programa: probar más tarde.")
     return False, ultima
 
 
-def descargar() -> list[str]:
+def descargar(motivos: dict[str, str] | None = None) -> list[str]:
     """Corre las descargas automáticas. Devuelve las que fallaron.
 
     Si falla la producción (la primera) no sigue con las demás: sin ella no se
     sabe qué mes estimar y ``correr`` frena.
+
+    Args:
+        motivos: Si se pasa, se llena con el mensaje de cada descarga que falló.
     """
     fallas = []
     for nombre, script in DESCARGAS:
@@ -160,6 +173,8 @@ def descargar() -> list[str]:
         print(f"  {'ok   ' if ok else 'FALLÓ'} {nombre}" + ("" if ok else f": {mensaje}"), flush=True)
         if not ok:
             fallas.append(nombre)
+            if motivos is not None:
+                motivos[nombre] = mensaje
             if nombre == DESCARGAS[0][0]:
                 break
     return fallas
@@ -323,11 +338,16 @@ def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | 
     else:
         if not sin_descargas:
             print("1. Descargas")
-            fallas = descargar()
-            if DESCARGAS[0][0] in fallas:
-                raise RuntimeError("No se pudo descargar la producción de la Secretaría de Energía y "
-                                   "sin ella no se sabe qué mes estimar. Si el sitio no responde, no "
-                                   "es un error del programa: esperar y volver a correr más tarde.")
+            motivos: dict[str, str] = {}
+            fallas = descargar(motivos)
+            produccion_fuente = DESCARGAS[0][0]
+            if produccion_fuente in fallas:
+                if motivos[produccion_fuente].startswith(SITIO_CAIDO):
+                    raise TodaviaNoSePuedeEstimar(
+                        "El sitio de la Secretaría de Energía no responde y sin la producción no se sabe "
+                        "qué mes estimar. Volver a correr en unas horas.")
+                raise RuntimeError("No se pudo descargar la producción de la Secretaría de Energía: "
+                                   f"{motivos[produccion_fuente]}. Pasarle este mensaje al equipo.")
             if fallas:
                 print(f"  Aviso: fallaron {len(fallas)} descargas; se sigue con los datos anteriores.")
         mes = ultimo_mes_produccion() + 1

@@ -4,6 +4,11 @@
   evaluación: el pronóstico contra ``results/modelo_final_predicciones.csv`` y
   la variación del IACA contra ``results/iaca_holdout_detalle.csv``. Si
   coinciden, el pipeline estima igual que el modelo que se evaluó.
+
+  Para que no dependa de lo que se haya descargado después, la simulación arma
+  aparte, en ``results/simulacion/base_evaluacion/``, una base solo con las
+  copias de ``data/snapshots/`` hasta ``FECHA_DATOS_EVALUACION`` (la versión de
+  los datos con que se corrió la evaluación). No toca ``data/bcr.db``.
 - Controla que frene si faltan las ventas de gasoil o las exportaciones del mes,
   y antes del día 28 del mes siguiente, completando igual los reales.
 - Controla los reintentos de las descargas y los avisos de INDEC (sin red).
@@ -13,12 +18,14 @@
 
 Corre X-13 (dos series por mes): tarda alrededor de un minuto y medio.
 
-Uso, desde la raíz del repo, con la base armada:
+Uso, desde la raíz del repo (sirve cualquier clon; no hace falta que la base
+esté al día):
     python scripts/test_pipeline.py
 """
 
 from __future__ import annotations
 
+import shutil
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -29,49 +36,115 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import build_db  # noqa: E402
 import pipeline  # noqa: E402
 import registro  # noqa: E402
 from build_db import leer_dataset  # noqa: E402
 from construir_features import OBJETIVOS  # noqa: E402
 
-RESULTS = Path(__file__).resolve().parents[1] / "results"
+RAIZ = Path(__file__).resolve().parents[1]
+RESULTS = RAIZ / "results"
+# Versión de los datos con que se corrió la evaluación (SCRUM-34, 42 y 63): la
+# última descarga que usaron results/modelo_final_predicciones.csv y
+# results/iaca_holdout_detalle.csv. Si se rehace la evaluación con datos más
+# nuevos, actualizar esta fecha.
+FECHA_DATOS_EVALUACION = "2026-11-05"
 # Un mes común, uno con la exportación oculta por INDEC y el último del holdout.
 MESES = ["2025-11", "2026-07", "2026-09"]
 NOMBRE_DE_ID = {v: k for k, v in OBJETIVOS.items()}
 
 
+_BASE_EVALUACION: Path | None = None
+
+
+def base_de_la_evaluacion() -> Path:
+    """Base con los datos de la evaluación, armada una sola vez por corrida de las pruebas.
+
+    Queda en ``results/simulacion/base_evaluacion/`` (no se versiona) y no se
+    borra al terminar: en Windows, SQLite puede tener el archivo abierto todavía.
+    """
+    global _BASE_EVALUACION
+    if _BASE_EVALUACION is None:
+        _BASE_EVALUACION = armar_base_de_la_evaluacion(pipeline.CARPETA_SIMULACION / "base_evaluacion")
+    return _BASE_EVALUACION
+
+
+def armar_base_de_la_evaluacion(destino: Path, fecha: str = FECHA_DATOS_EVALUACION) -> Path:
+    """Arma en ``destino`` una base solo con las copias de ``data/snapshots/`` hasta ``fecha``.
+
+    Es la base que tenía la evaluación: lo que se haya descargado después no
+    cambia la simulación. Borra antes lo que hubiera en ``destino``. Devuelve
+    la ruta de la base.
+    """
+    shutil.rmtree(destino, ignore_errors=True)
+    raiz = Path(destino) / "repo"
+    shutil.copytree(RAIZ / "db", raiz / "db")
+    (raiz / "data" / "snapshots").mkdir(parents=True)
+    shutil.copy(RAIZ / "data" / "disponibilidad_variables.csv", raiz / "data")
+    manifiesto = pd.read_csv(RAIZ / "data" / "snapshots" / "manifiesto.csv", dtype=str, keep_default_na=False)
+    hasta = manifiesto[manifiesto["fecha_descarga"] <= fecha]
+    faltan = [a for a in hasta["archivo_snapshot"] if not (RAIZ / "data" / "snapshots" / a).exists()]
+    if faltan:
+        raise AssertionError(f"Faltan copias de los datos de la evaluación en data/snapshots/: {faltan}. "
+                             "Correr la prueba en un clon del repo con data/snapshots/ completo.")
+    for a in hasta["archivo_snapshot"]:
+        (raiz / "data" / "snapshots" / a).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(RAIZ / "data" / "snapshots" / a, raiz / "data" / "snapshots" / a)
+    hasta.to_csv(raiz / "data" / "snapshots" / "manifiesto.csv", index=False)
+    db = raiz / "data" / "bcr.db"
+    build_db.reconstruir(raiz, db)
+    return db
+
+
+def _coincide(obtenido: float, esperado: float, que: str, tol: dict) -> None:
+    """Igual que la evaluación, o un mensaje que explica la causa más probable."""
+    if not np.isclose(obtenido, esperado, **tol):
+        raise AssertionError(
+            f"{que}: el pipeline da {obtenido:,.4f} y la evaluación guardó {esperado:,.4f}. "
+            f"La simulación usa los datos hasta el {FECHA_DATOS_EVALUACION}; si cambió el código de un "
+            "modelo, o se rehizo la evaluación con datos más nuevos sin actualizar FECHA_DATOS_EVALUACION, "
+            "esta prueba tiene que fallar. Ver docs/pipeline.md, sección 4.")
+
+
 def test_simulacion_coincide_con_la_evaluacion():
     pred = pd.read_csv(RESULTS / "modelo_final_predicciones.csv")
     iaca = pd.read_csv(RESULTS / "iaca_holdout_detalle.csv")
-    for mes in MESES:
-        pipeline.correr(simular=mes)
-        reg = pd.read_csv(pipeline.CARPETA_SIMULACION / f"registro_{mes}.csv")
-        for _, fila in reg.iterrows():
-            serie = NOMBRE_DE_ID[fila["serie_id"]]
-            if fila["modelo"] == "modelo_final":
-                esperado = pred[(pred["serie"] == serie) & pred["fecha"].str.startswith(mes)]["prediccion"]
-                assert np.isclose(fila["pronostico"], esperado.iloc[0], rtol=1e-9), (mes, serie)
-            if pd.notna(fila["variacion_pronosticada_pct"]):
-                e = iaca[(iaca["serie"] == serie) & (iaca["modelo"] == fila["modelo"]) & (iaca["fecha"] == mes)]
-                assert len(e) == 1, (mes, serie, fila["modelo"])
-                assert np.isclose(fila["pronostico"], e["produccion_pronosticada"].iloc[0], rtol=1e-9)
-                assert np.isclose(fila["variacion_pronosticada_pct"], e["variacion_pronosticada_pct"].iloc[0],
-                                  atol=1e-9), (mes, serie, fila["modelo"])
-        contrib = registro.leer_contribuciones(pipeline.CARPETA_SIMULACION / f"contribuciones_{mes}.csv")
-        assert list(contrib.columns) == registro.COLUMNAS_CONTRIBUCIONES
-        assert "total" not in set(contrib["factor"]), mes
-        final = reg[reg["modelo"] == "modelo_final"].set_index("estimacion_id")["pronostico"]
-        suma = contrib.groupby(contrib["estimacion_id"].astype(int))["aporte"].sum()
-        assert sorted(suma.index) == sorted(final.index), (mes, "solo y todas las del modelo final")
-        assert np.allclose(suma.loc[final.index], final, rtol=1e-9), mes
-        oculto = contrib[(contrib["factor"] == "exportaciones") & (contrib["nota"] != "")]
-        assert (len(oculto) > 0) == (mes == "2026-07"), (mes, "aviso de exportaciones estimadas")
+    db = base_de_la_evaluacion()
+    with _reemplazos(pipeline, leer_dataset=lambda: leer_dataset(db)):
+        for mes in MESES:
+            _simular_y_comparar(mes, pred, iaca)
     print(f"ok  la simulación da el mismo pronóstico y la misma variación del IACA que la evaluación "
-          f"({', '.join(MESES)})")
+          f"({', '.join(MESES)}; datos hasta el {FECHA_DATOS_EVALUACION})")
+
+
+def _simular_y_comparar(mes: str, pred: pd.DataFrame, iaca: pd.DataFrame) -> None:
+    pipeline.correr(simular=mes)
+    reg = pd.read_csv(pipeline.CARPETA_SIMULACION / f"registro_{mes}.csv")
+    for _, fila in reg.iterrows():
+        serie = NOMBRE_DE_ID[fila["serie_id"]]
+        if fila["modelo"] == "modelo_final":
+            esperado = pred[(pred["serie"] == serie) & pred["fecha"].str.startswith(mes)]["prediccion"]
+            _coincide(fila["pronostico"], esperado.iloc[0], f"Pronóstico de {serie} {mes}", {"rtol": 1e-9})
+        if pd.notna(fila["variacion_pronosticada_pct"]):
+            e = iaca[(iaca["serie"] == serie) & (iaca["modelo"] == fila["modelo"]) & (iaca["fecha"] == mes)]
+            assert len(e) == 1, (mes, serie, fila["modelo"])
+            _coincide(fila["pronostico"], e["produccion_pronosticada"].iloc[0],
+                      f"Pronóstico de {fila['modelo']} para {serie} {mes}", {"rtol": 1e-9})
+            _coincide(fila["variacion_pronosticada_pct"], e["variacion_pronosticada_pct"].iloc[0],
+                      f"Variación del IACA de {fila['modelo']} para {serie} {mes}", {"atol": 1e-9})
+    contrib = registro.leer_contribuciones(pipeline.CARPETA_SIMULACION / f"contribuciones_{mes}.csv")
+    assert list(contrib.columns) == registro.COLUMNAS_CONTRIBUCIONES
+    assert "total" not in set(contrib["factor"]), mes
+    final = reg[reg["modelo"] == "modelo_final"].set_index("estimacion_id")["pronostico"]
+    suma = contrib.groupby(contrib["estimacion_id"].astype(int))["aporte"].sum()
+    assert sorted(suma.index) == sorted(final.index), (mes, "solo y todas las del modelo final")
+    assert np.allclose(suma.loc[final.index], final, rtol=1e-9), mes
+    oculto = contrib[(contrib["factor"] == "exportaciones") & (contrib["nota"] != "")]
+    assert (len(oculto) > 0) == (mes == "2026-07"), (mes, "aviso de exportaciones estimadas")
 
 
 def test_frena_si_faltan_datos_del_mes():
-    base = leer_dataset()
+    base = leer_dataset(base_de_la_evaluacion())
     mes = pd.Period("2026-09", freq="M")
     assert pipeline.faltantes_del_mes(base, mes) == []
     sin_gasoil = base.copy()
@@ -150,6 +223,14 @@ def test_descargas_reintenta():
         with _reemplazos(pipeline, _correr=correr_falso([error] * 3)):
             ok, mensaje = pipeline._descargar_una("x", ["x.py"])
         assert not ok and mensaje == "KeyError: 'produccion_tn'"
+        # Si la producción no se puede bajar porque el sitio no responde, no es un error:
+        # NO SE ESTIMÓ (TodaviaNoSePuedeEstimar). Si es otra cosa, ERROR (RuntimeError).
+        with _reemplazos(pipeline, _correr=correr_falso([conexion] * 3)):
+            e = _error(lambda: pipeline.correr())
+        assert type(e) is pipeline.TodaviaNoSePuedeEstimar and "no responde" in str(e), e
+        with _reemplazos(pipeline, _correr=correr_falso([error] * 3)):
+            e = _error(lambda: pipeline.correr())
+        assert type(e) is RuntimeError and "produccion_tn" in str(e), e
     print("ok  las descargas se reintentan y, si el sitio no responde, lo dice")
 
 
