@@ -20,6 +20,7 @@ la BCR vea de dónde sale cada número. Cada hoja está lista para imprimir
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -200,6 +201,15 @@ def _hoja_estimacion(wb: Workbook, d: dict) -> None:
     _imprimir(ws)
 
 
+def _escala(valores: list[float], marcas: int = 4) -> tuple[float, float, float]:
+    """Mínimo, máximo y paso redondos para un eje que incluye el cero."""
+    lo, hi = min([0.0, *valores]), max([0.0, *valores])
+    bruto = (hi - lo) / marcas or 1.0
+    mag = 10 ** math.floor(math.log10(bruto))
+    paso = next(k * mag for k in (1, 2, 2.5, 5, 10) if k * mag >= bruto)
+    return math.floor(lo / paso) * paso, math.ceil(hi / paso) * paso, paso
+
+
 def _hoja_factores(wb: Workbook, d: dict) -> None:
     ws = wb.create_sheet("Factores")
     mes, ant = d["mes"], _anterior(d["mes"])
@@ -241,6 +251,11 @@ def _hoja_factores(wb: Workbook, d: dict) -> None:
         graf.y_axis.majorGridlines = None
         graf.x_axis.scaling.orientation = "maxMin"
         graf.x_axis.tickLblPos = "low"   # etiquetas a la izquierda, no sobre las barras negativas
+        # Con las categorías invertidas el eje de valores queda arriba, encima del
+        # título: "max" lo baja. Y pocas marcas redondas para que no se pisen.
+        graf.y_axis.crosses = "max"
+        lo, hi, paso = _escala([fac["cambio"] for fac in s["factores"]])
+        graf.y_axis.scaling.min, graf.y_axis.scaling.max, graf.y_axis.majorUnit = lo, hi, paso
         graf.x_axis.delete = graf.y_axis.delete = False  # openpyxl 3.1 los oculta por defecto
         graf.add_data(Reference(ws, min_col=2, min_row=f0 + 1, max_row=f - 1), titles_from_data=False)
         graf.set_categories(Reference(ws, min_col=1, min_row=f0 + 1, max_row=f - 1))
@@ -390,7 +405,8 @@ def _hoja_serie(wb: Workbook, d: dict) -> None:
         g.y_axis.numFmt = "#,##0"
         g.y_axis.majorGridlines = None
         g.x_axis.delete = g.y_axis.delete = False  # openpyxl 3.1 los oculta por defecto
-        g.legend.position = "b"
+        g.legend.position = "r"      # a la derecha: abajo se pisa con los meses y arriba con el título
+        g.legend.overlay = False     # la leyenda no se dibuja encima del área del gráfico
         g.add_data(Reference(ws, min_col=2 + 3 * j, max_col=4 + 3 * j, min_row=4, max_row=ult), titles_from_data=True)
         g.set_categories(Reference(ws, min_col=1, min_row=5, max_row=ult))
         for serie, color, ancho, guion in zip(g.series, ("262626", AZUL, "B07A17"), (28000, 19000, 15000),
@@ -398,7 +414,9 @@ def _hoja_serie(wb: Workbook, d: dict) -> None:
             serie.smooth = False
             serie.graphicalProperties = GraphicalProperties(ln=LineProperties(solidFill=color, w=ancho, prstDash=guion))
         g.height, g.width = 8, 22
-        ws.add_chart(g, f"I{4 + 17 * j}")
+        # Desde la fila 5: si arranca en las filas congeladas (1 a 4), el borde de
+        # arriba del gráfico queda fijo al scrollear.
+        ws.add_chart(g, f"I{5 + 17 * j}")
     _anchos(ws, {"A": 10, **{get_column_letter(c): 15 for c in range(2, 8)}})
     ws.freeze_panes = "B5"
     _imprimir(ws)
