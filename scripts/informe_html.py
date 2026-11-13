@@ -23,6 +23,7 @@ import math
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
@@ -74,9 +75,42 @@ def nombre_variable(v: str) -> str:
     return f"{texto} (dato faltante)" if faltante else texto
 
 
-def _factores(t: pd.DataFrame) -> list[dict]:
+def _nombre(r: pd.Series) -> str:
+    """Nombre legible de la variable de una fila del detalle, con su insumo si lo tiene."""
+    insumo = r.get("insumo", "")
+    return nombre_variable(r["variable"]) + (f" ({insumo})" if isinstance(insumo, str) and insumo else "")
+
+
+def _con_insumo(total: pd.DataFrame | None, partes: dict[str, pd.DataFrame | None]) -> pd.DataFrame | None:
+    """Detalle del bioetanol total con el insumo de cada variable.
+
+    El total suma los modelos de maíz y de caña, así que las mismas variables
+    ("producción del mes anterior", "ventas nafta total m3") aparecen dos
+    veces. Cada fila se busca en el detalle de maíz y en el de caña (misma
+    variable, mismo cambio) para agregarle "(maíz)" o "(caña)".
+    """
+    if total is None:
+        return None
+    d = total.copy()
+    insumos = []
+    for _, r in d.iterrows():
+        insumo = ""
+        for nombre, p in partes.items():
+            if p is None or p.empty:
+                continue
+            igual = (p["variable"] == r["variable"]) & np.isclose(
+                p["cambio"].astype(float), float(r["cambio"]), rtol=1e-9, atol=1e-6)
+            if igual.any():
+                insumo = nombre
+                break
+        insumos.append(insumo)
+    d["insumo"] = insumos
+    return d
+
+
+def _factores(t: pd.DataFrame, detalle: pd.DataFrame | None = None) -> list[dict]:
     real_ant = t.attrs["real_anterior"]
-    detalle = t.attrs.get("detalle_variables")
+    detalle = t.attrs.get("detalle_variables") if detalle is None else detalle
     salida = []
     for _, f in t[~t["factor"].isin(["total", "constante"])].iterrows():
         cambio = f["aporte_variacion_produccion_pp"] * real_ant / 100
@@ -85,7 +119,7 @@ def _factores(t: pd.DataFrame) -> list[dict]:
             d = detalle[detalle["factor"] == f["factor"]]
             d = d[d["cambio"].abs() > 0.5]
             d = d.loc[d["cambio"].abs().sort_values(ascending=False).index]
-            variables = [{"nombre": nombre_variable(r["variable"]), "cambio": _num(r["cambio"])}
+            variables = [{"nombre": _nombre(r), "cambio": _num(r["cambio"])}
                          for _, r in d.head(5).iterrows()]
         salida.append({"factor": f["factor"], "cambio": _num(cambio),
                        "pp": _num(f["aporte_variacion_produccion_pp"]),
@@ -168,10 +202,21 @@ def armar_datos(mes: pd.Period, tablas: dict[str, pd.DataFrame], filas_registro:
                 seguimiento: pd.DataFrame, reales_series: dict[str, pd.Series],
                 estimados_series: dict[str, pd.Series], x13_series: dict[str, pd.Series],
                 nombres: dict[str, str], unidades: dict[str, str], ids_serie: dict[str, str],
-                simulacion: bool = False, reales: dict[str, float] | None = None) -> dict:
-    """Datos de la corrida que usan el informe HTML y el Excel (una sola fuente)."""
+                simulacion: bool = False, reales: dict[str, float] | None = None,
+                fuentes_caidas: list[dict] | None = None) -> dict:
+    """Datos de la corrida que usan el informe HTML y el Excel (una sola fuente).
+
+    Args:
+        fuentes_caidas: Descargas que fallaron (fuente, motivo, ``dato_hasta``):
+            se usó el dato anterior y los informes lo avisan arriba.
+    """
     series = []
     for serie, t in tablas.items():
+        detalle = t.attrs.get("detalle_variables")
+        if serie == "bioetanol_total":
+            detalle = _con_insumo(detalle, {
+                "maíz": tablas["bioetanol_maiz"].attrs.get("detalle_variables") if "bioetanol_maiz" in tablas else None,
+                "caña": tablas["bioetanol_cana"].attrs.get("detalle_variables") if "bioetanol_cana" in tablas else None})
         reg = filas_registro[filas_registro["serie_id"] == ids_serie[serie]].set_index("modelo")
         final = reg.loc["modelo_final"] if "modelo_final" in reg.index else None
         x13 = reg.loc["x13_bcr"] if "x13_bcr" in reg.index else None
@@ -186,15 +231,14 @@ def armar_datos(mes: pd.Period, tablas: dict[str, pd.DataFrame], filas_registro:
             "x13_var_iaca": _num(x13["variacion_pronosticada_pct"]) if x13 is not None else None,
             "real": _num(reales[serie]) if reales else None,
             "expo_estimada": bool(t.attrs["exportaciones_estimadas"]),
-            "factores": _factores(t),
+            "factores": _factores(t, detalle),
             "historia": {k: {str(m): _num(v) for m, v in ser.items()} for k, ser in
                          (("real", reales_series[serie]), ("modelo", estimados_series[serie]),
                           ("x13", x13_series.get(serie, pd.Series(dtype=float))))},
         }
         s["texto"] = parrafo(s, mes)
-        detalle = t.attrs.get("detalle_variables")
         s["variables"] = [] if detalle is None else [
-            {"factor": r["factor"], "nombre": nombre_variable(r["variable"]), "cambio": _num(r["cambio"])}
+            {"factor": r["factor"], "nombre": _nombre(r), "cambio": _num(r["cambio"])}
             for _, r in detalle[detalle["cambio"].abs() > 0.5].iterrows()]
         series.append(s)
 
@@ -212,7 +256,21 @@ def armar_datos(mes: pd.Period, tablas: dict[str, pd.DataFrame], filas_registro:
         "mes": str(mes), "corrida": f"{datetime.now():%d/%m/%Y %H:%M}", "simulacion": simulacion,
         "series": series, "seguimiento": seg, "metricas": _metricas_seguimiento(seg),
         "aviso_expo": any(s["expo_estimada"] for s in series),
+        "fuentes_caidas": list(fuentes_caidas or []),
+        "aviso_fuentes": texto_fuentes_caidas(fuentes_caidas or []),
     }
+
+
+def texto_fuentes_caidas(caidas: list[dict]) -> str:
+    """Aviso de las fuentes que no se pudieron bajar (vacío si no falló ninguna)."""
+    if not caidas:
+        return ""
+    def mes(m):
+        return f"{m[5:7]}/{m[:4]}" if m else "un mes anterior"
+    partes = [f"{c['fuente']} (se usó el dato de {mes(c.get('dato_hasta'))})" for c in caidas]
+    return ("No se pudo bajar " + (partes[0] if len(partes) == 1 else ", ".join(partes[:-1]) + " ni " + partes[-1])
+            + ": el sitio no respondió o cambió el archivo, y la estimación usa el último dato que ya estaba. "
+            "Conviene volver a correr cuando la fuente vuelva.")
 
 
 def escribir(datos: dict, ruta: Path) -> Path:
@@ -248,6 +306,7 @@ h1{font-size:34px;line-height:1.15;margin:22px 0 6px}
 .bajada{font-family:Georgia,"Times New Roman",serif;font-size:19px;color:var(--gris);margin:0 0 14px}
 .ficha{font-size:13px;color:var(--gris);border-top:1px solid var(--linea);border-bottom:1px solid var(--linea);padding:8px 0;display:flex;flex-wrap:wrap;gap:6px 24px}
 .ficha b{color:var(--tinta);font-weight:600}
+.nota-fuentes{margin:14px 0 0;font-size:13.5px;background:#FFF4CE;border-left:3px solid #C99A00;padding:8px 12px;color:#4D3B00}
 .nota-sim{margin:18px 0 0;font-size:13.5px;border-left:3px solid var(--x13);padding:4px 0 4px 12px;color:var(--gris)}
 .resumen{margin:26px 0 8px}
 .resumen p{margin:0 0 12px;max-width:74ch}
@@ -307,6 +366,7 @@ footer{margin-top:40px;padding-top:10px;border-top:2px solid var(--tinta);font-s
 <p class="bajada">Estimación de __MES__</p>
 <div class="ficha" id="ficha"></div>
 <div id="sim"></div>
+<p id="fuentes" class="nota-fuentes" hidden></p>
 <section class="resumen" id="resumen"></section>
 
 <div class="rotulo"><b>Tabla 1.</b> Estimación del mes y variación que se publicaría en el IACA</div>
@@ -379,6 +439,7 @@ if(mz&&cn){const p=document.createElement('p');p.innerHTML='Por insumo, el bioet
  ') y el de caña en '+f0.format(cn.prediccion)+' m³ ('+pct(cn.var_produccion)+').';res.appendChild(p)}
 document.getElementById('pie').textContent='Generado por scripts/salida_mensual.py';
 document.getElementById('nota-expo').hidden=!D.aviso_expo;
+if(D.aviso_fuentes){const e=document.getElementById('fuentes');e.textContent='Aviso: '+D.aviso_fuentes;e.hidden=false}
 
 // tabla 1
 (function(){const sim=D.series.some(s=>s.real!=null);

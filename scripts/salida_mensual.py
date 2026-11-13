@@ -15,6 +15,12 @@ Lo que corre el doble clic en ``correr_estimacion.bat``:
 El Excel y el HTML se pueden borrar y volver a generar desde el JSON sin
 correr el modelo de nuevo (``--regenerar AAAA-MM``).
 
+Lo que se ve en la ventana queda también en ``resultados/ultima_corrida.log``
+(se pisa en cada corrida). Si hay un error inesperado, ahí queda el detalle.
+
+Las simulaciones van a ``resultados/simulacion/`` y sus archivos empiezan con
+``SIMULACION_``.
+
 Si todavía no se puede estimar el mes (antes del día 28 del mes siguiente,
 faltan las ventas de gasoil o las exportaciones de INDEC, o el sitio de la
 producción no responde), frena sin armar informes. No es un error del programa:
@@ -37,7 +43,7 @@ import os
 import shutil
 import sys
 import traceback
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -54,6 +60,9 @@ CARPETA = RAIZ / "resultados"
 CARPETA_SIMULACION = CARPETA / "simulacion"
 CARPETA_RESPALDO = CARPETA / "respaldo"
 RESPALDOS_A_CONSERVAR = 12
+LOG = "ultima_corrida.log"  # en CARPETA; se pisa en cada corrida
+RESULTADO = {0: "listo", 1: "error", 3: "todavía no se puede estimar"}
+PREFIJO_SIMULACION = "SIMULACION_"
 TODAVIA_NO = 3  # código de salida cuando todavía no se puede estimar el mes (no es un error)
 A_RESPALDAR = {  # archivo -> prefijo de la copia
     RAIZ / "data" / "bcr.db": "base",
@@ -62,10 +71,18 @@ A_RESPALDAR = {  # archivo -> prefijo de la copia
 }
 
 
-def rutas(mes: str, carpeta: Path = CARPETA) -> dict[str, Path]:
-    return {"json": carpeta / f"estimacion_{mes}.json",
-            "excel": carpeta / f"IACA_biocombustibles_{mes}.xlsx",
-            "html": carpeta / f"estimacion_{mes}.html"}
+def rutas(mes: str, carpeta: Path = CARPETA, simulacion: bool | None = None) -> dict[str, Path]:
+    """Archivos del mes. Los de una simulación empiezan con ``SIMULACION_``.
+
+    Args:
+        simulacion: Por defecto, si ``carpeta`` es la de simulaciones.
+    """
+    if simulacion is None:
+        simulacion = Path(carpeta) == CARPETA_SIMULACION
+    pre = PREFIJO_SIMULACION if simulacion else ""
+    return {"json": carpeta / f"{pre}estimacion_{mes}.json",
+            "excel": carpeta / f"{pre}IACA_biocombustibles_{mes}.xlsx",
+            "html": carpeta / f"{pre}estimacion_{mes}.html"}
 
 
 # ------------------------------------------------------------------ respaldo
@@ -132,7 +149,8 @@ def datos_del_mes(res: dict) -> dict:
         mes, res["tablas"], res["filas"], _seguimiento(res["ruta_registro"], mes if res["simulacion"] else None),
         {s: pipeline._serie(res["base"], s, hasta=mes - 1) for s in pipeline.SERIES},
         _estimados_anteriores(res["ruta_registro"]), _estimados_anteriores(res["ruta_registro"], "x13_bcr"),
-        pipeline.NOMBRE, pipeline.UNIDAD, pipeline.OBJETIVOS, simulacion=res["simulacion"], reales=res["reales"])
+        pipeline.NOMBRE, pipeline.UNIDAD, pipeline.OBJETIVOS, simulacion=res["simulacion"], reales=res["reales"],
+        fuentes_caidas=res.get("fuentes_caidas", []))
 
 
 # ------------------------------------------------------------------ archivos
@@ -154,11 +172,18 @@ def _avisar_si_abierto(ruta: Path) -> None:
 
 
 def escribir_informes(datos: dict, carpeta: Path) -> dict[str, Path]:
-    """Guarda el JSON del mes y arma el Excel y el HTML desde ese JSON."""
+    """Guarda el JSON del mes y arma el Excel y el HTML desde ese JSON.
+
+    El JSON se guarda antes de mirar si el Excel está abierto: la estimación
+    ya quedó en el registro, así que el JSON tiene que ser el de esta corrida
+    para que ``--regenerar`` arme el Excel con los números nuevos.
+    """
     r = rutas(datos["mes"], carpeta)
     carpeta.mkdir(parents=True, exist_ok=True)
-    _avisar_si_abierto(r["excel"])
     r["json"].write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
+    if excel_abierto(r["excel"]):
+        raise RuntimeError(f"El Excel {r['excel'].name} está abierto. La estimación ya quedó guardada: "
+                           f"cerralo y corré --regenerar {datos['mes']} (no hace falta estimar de nuevo).")
     return regenerar(datos["mes"], carpeta)
 
 
@@ -176,6 +201,26 @@ def regenerar(mes: str, carpeta: Path = CARPETA) -> dict[str, Path]:
                            f"(o usá --regenerar {mes}).") from e
     informe_html.escribir(datos, r["html"])
     return r
+
+
+# ------------------------------------------------------------------ log
+
+class _Duplicar:
+    """Escribe en la consola y en el log a la vez."""
+
+    def __init__(self, consola, archivo):
+        self.consola, self.archivo = consola, archivo
+
+    def write(self, texto: str) -> int:
+        self.archivo.write(texto)
+        return self.consola.write(texto)
+
+    def flush(self) -> None:
+        self.archivo.flush()
+        self.consola.flush()
+
+    def __getattr__(self, nombre):
+        return getattr(self.consola, nombre)
 
 
 # ------------------------------------------------------------------ corrida
@@ -210,11 +255,28 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--regenerar", metavar="AAAA-MM", help="rearmar el Excel y el HTML de un mes desde su JSON")
     p.add_argument("--abrir", action="store_true", help="abrir el informe al terminar (Windows)")
     a = p.parse_args(argv)
+    CARPETA.mkdir(parents=True, exist_ok=True)
+    ruta_log = CARPETA / LOG
+    consola = (sys.stdout, sys.stderr)
+    argumentos = " ".join(sys.argv[1:] if argv is None else argv)
+    # utf-8-sig (con BOM): así el Bloc de notas y el "type" de PowerShell muestran bien las tildes.
+    with open(ruta_log, "w", encoding="utf-8-sig") as log:
+        sys.stdout, sys.stderr = _Duplicar(consola[0], log), _Duplicar(consola[1], log)
+        try:
+            print(f"Corrida del {datetime.now():%d/%m/%Y %H:%M}: salida_mensual.py {argumentos}".rstrip() + "\n")
+            codigo = _correr_main(a, ruta_log, log)
+            print(f"\nCódigo de salida: {codigo} ({RESULTADO.get(codigo, 'error')})")
+            return codigo
+        finally:
+            sys.stdout, sys.stderr = consola
+
+
+def _correr_main(a: argparse.Namespace, ruta_log: Path, log) -> int:
     try:
         if a.regenerar:
-            r = regenerar(str(pd.Period(a.regenerar, freq="M")),
-                          CARPETA_SIMULACION if rutas(a.regenerar, CARPETA_SIMULACION)["json"].exists()
-                          and not rutas(a.regenerar)["json"].exists() else CARPETA)
+            mes = str(pd.Period(a.regenerar, freq="M"))
+            r = regenerar(mes, CARPETA_SIMULACION if rutas(mes, CARPETA_SIMULACION)["json"].exists()
+                          and not rutas(mes)["json"].exists() else CARPETA)
             print(f"Listo: {r['excel'].relative_to(RAIZ)} y {r['html'].relative_to(RAIZ)}")
         else:
             correr(a.sin_descargas, a.simular, a.abrir)
@@ -224,14 +286,19 @@ def main(argv: list[str] | None = None) -> int:
     except (RuntimeError, ValueError, FileNotFoundError) as e:
         print(f"\nERROR: {e}", file=sys.stderr)
         return 1
-    except Exception as e:  # noqa: BLE001  (cualquier otra falla: mensaje claro y detalle en un archivo)
-        CARPETA.mkdir(parents=True, exist_ok=True)
-        detalle = CARPETA / "ultimo_error.txt"
-        detalle.write_text(traceback.format_exc(), encoding="utf-8")
-        print(f"\nERROR inesperado: {e}\nEl detalle quedó en {detalle.relative_to(RAIZ)}; "
+    except Exception as e:  # noqa: BLE001  (cualquier otra falla: mensaje claro y detalle en el log)
+        log.write("\n" + traceback.format_exc())  # el detalle va solo al log, no a la ventana
+        print(f"\nERROR inesperado: {e}\nEl detalle quedó en {_relativa(ruta_log)}; "
               "mandáselo al equipo.", file=sys.stderr)
         return 1
     return 0
+
+
+def _relativa(ruta: Path) -> Path:
+    try:
+        return ruta.relative_to(RAIZ)
+    except ValueError:
+        return ruta
 
 
 if __name__ == "__main__":

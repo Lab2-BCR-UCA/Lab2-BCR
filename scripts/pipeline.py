@@ -123,6 +123,18 @@ DESCARGAS = [
     ("aceite de soja y azúcar", ["variables_externas/descargar_aceite_soja.py"]),
 ]
 
+# Fuentes de db/fuentes.csv que actualiza cada descarga. Si una falla, el
+# informe avisa hasta qué mes llega el dato que se usó.
+FUENTES_DE_DESCARGA = {
+    "producción (Secretaría de Energía)": ("produccion_biodiesel", "produccion_bioetanol"),
+    "soja y maíz (CAC)": ("pizarra_cac",),
+    "tipo de cambio (BCRA)": ("tipo_cambio",),
+    "precios regulados": ("precios_biodiesel", "precios_bioetanol"),
+    "molienda de soja": ("molienda_soja",),
+    "ventas de gasoil y nafta": ("combustibles",),
+    "aceite de soja y azúcar": ("aceite_soja", "azucar"),
+}
+
 
 # ------------------------------------------------------------------ pasos
 
@@ -180,6 +192,30 @@ def descargar(motivos: dict[str, str] | None = None) -> list[str]:
     return fallas
 
 
+def ultimo_dato(descarga: str, raiz: Path = RAIZ) -> str | None:
+    """Último mes con dato de las fuentes de una descarga (``AAAA-MM``).
+
+    Lee el CSV de cada fuente (``db/fuentes.csv``) y las columnas que usa la
+    base (``db/series.csv``). Si la descarga actualiza más de una fuente,
+    devuelve el mes más viejo de todas. ``None`` si no se puede leer.
+    """
+    try:
+        fuentes = pd.read_csv(raiz / "db" / "fuentes.csv").set_index("fuente")
+        series = pd.read_csv(raiz / "db" / "series.csv")
+        meses = []
+        for fuente in FUENTES_DE_DESCARGA.get(descarga, ()):
+            df = pd.read_csv(raiz / fuentes.loc[fuente, "archivo_origen"])
+            cols = [c for c in series.loc[series["fuente"] == fuente, "columna_origen"] if c in df.columns]
+            con_dato = df[cols].apply(pd.to_numeric, errors="coerce").notna().any(axis=1)
+            fechas = pd.to_datetime(df.loc[con_dato, "fecha"])
+            if fechas.empty:
+                return None
+            meses.append(pd.Period(fechas.max(), freq="M"))
+        return str(min(meses)) if meses else None
+    except Exception:  # noqa: BLE001  (es solo para el aviso: si no se puede leer, no se informa el mes)
+        return None
+
+
 def fecha_para_correr(mes: pd.Period) -> date:
     """Desde cuándo se puede estimar ``mes``: el día 28 del mes siguiente."""
     return (mes + 1).to_timestamp().date().replace(day=DIA_CORRIDA)
@@ -234,6 +270,16 @@ def _bajado(ruta: Path) -> date | None:
         return descargado_el(ruta).date()
     except ValueError:
         return None
+
+
+def _base_para_simular() -> pd.DataFrame:
+    """Dataset para simular. En una copia nueva del repo la base no está armada: la arma."""
+    try:
+        return leer_dataset()
+    except Exception:  # noqa: BLE001  (base sin armar o vacía: se arma y se vuelve a leer)
+        print("La base todavía no está armada: se arma ahora (scripts/build_db.py).")
+        armar_base()
+        return leer_dataset()
 
 
 def armar_base() -> None:
@@ -307,7 +353,9 @@ def armar_contribuciones(tablas: dict[str, pd.DataFrame], ids: dict[str, int]) -
 
 def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | None = None) -> dict:
     """Corre el pipeline. Devuelve el mes, las tablas de contribuciones, las filas
-    agregadas al registro y, si es una simulación, los reales del mes.
+    agregadas al registro, las descargas que fallaron (``fuentes_caidas``: fuente,
+    motivo y hasta qué mes llega el dato que se usó) y, si es una simulación,
+    los reales del mes.
 
     Si todavía no se puede estimar el mes (antes del día 28 del mes siguiente,
     o faltan las ventas de gasoil o las exportaciones), completa igual los
@@ -317,6 +365,7 @@ def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | 
         hoy: Fecha de la corrida (pruebas). Por defecto, hoy.
     """
     hoy = hoy or date.today()
+    fuentes_caidas: list[dict] = []
     print(f"Pipeline de estimación — {datetime.now():%d/%m/%Y %H:%M}\n", flush=True)
     elegidos = modelos_elegidos()
 
@@ -324,7 +373,7 @@ def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | 
         mes = pd.Period(simular, freq="M")
         print(f"SIMULACIÓN de {mes}: se oculta la producción desde ese mes. No se descarga nada "
               "ni se toca el registro real.\n")
-        base_completa = leer_dataset()
+        base_completa = _base_para_simular()
         base = ocultar_desde(base_completa, mes)
         CARPETA_SIMULACION.mkdir(parents=True, exist_ok=True)
         ruta_registro = CARPETA_SIMULACION / f"registro_{mes}.csv"
@@ -350,6 +399,11 @@ def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | 
                                    f"{motivos[produccion_fuente]}. Pasarle este mensaje al equipo.")
             if fallas:
                 print(f"  Aviso: fallaron {len(fallas)} descargas; se sigue con los datos anteriores.")
+                fuentes_caidas = [{"fuente": f, "motivo": motivos.get(f, ""), "dato_hasta": ultimo_dato(f)}
+                                  for f in fallas]
+                for c in fuentes_caidas:
+                    if c["dato_hasta"]:
+                        print(f"        {c['fuente']}: se usa el dato hasta {c['dato_hasta']}")
         mes = ultimo_mes_produccion() + 1
         desde = fecha_para_correr(mes)
         temprano = hoy < desde
@@ -407,7 +461,7 @@ def correr(sin_descargas: bool = False, simular: str | None = None, hoy: date | 
     _imprimir_resumen(tablas, filas, reales)
     return {
         "mes": mes, "tablas": tablas, "filas": filas, "reales": reales, "simulacion": bool(simular),
-        "elegidos": elegidos, "contribuciones": contribuciones,
+        "elegidos": elegidos, "contribuciones": contribuciones, "fuentes_caidas": fuentes_caidas,
         "ruta_registro": ruta_registro, "ruta_contribuciones": ruta_contrib,
         "base": base_completa if simular else base,
     }

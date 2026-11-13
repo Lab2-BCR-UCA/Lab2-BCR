@@ -138,6 +138,9 @@ def _hoja_estimacion(wb: Workbook, d: dict) -> None:
         ws["A3"] = (f"Ejercicio sobre un mes ya publicado: se estima {_mes_largo(mes)} con los datos que había "
                     f"hasta {_mes_largo(ant)} y se compara con el dato real que salió después.")
         ws["A3"].font = T_NOTA
+    if d.get("aviso_fuentes"):
+        c = _texto(ws, 4, "Aviso: " + d["aviso_fuentes"], Font(bold=True, size=10, color="4D3B00"), hasta=11, alto=30)
+        c.fill = PatternFill("solid", fgColor="FFF4CE")
 
     ws["A5"] = "Tabla 1. Estimación del mes y variación que se publicaría en el IACA"
     ws["A5"].font = T_SECCION
@@ -238,6 +241,7 @@ def _hoja_factores(wb: Workbook, d: dict) -> None:
         graf.y_axis.majorGridlines = None
         graf.x_axis.scaling.orientation = "maxMin"
         graf.x_axis.tickLblPos = "low"   # etiquetas a la izquierda, no sobre las barras negativas
+        graf.x_axis.delete = graf.y_axis.delete = False  # openpyxl 3.1 los oculta por defecto
         graf.add_data(Reference(ws, min_col=2, min_row=f0 + 1, max_row=f - 1), titles_from_data=False)
         graf.set_categories(Reference(ws, min_col=1, min_row=f0 + 1, max_row=f - 1))
         graf.series[0].graphicalProperties.solidFill = AZUL
@@ -385,6 +389,7 @@ def _hoja_serie(wb: Workbook, d: dict) -> None:
         g.title = f"{s['nombre']} ({s['unidad']})"
         g.y_axis.numFmt = "#,##0"
         g.y_axis.majorGridlines = None
+        g.x_axis.delete = g.y_axis.delete = False  # openpyxl 3.1 los oculta por defecto
         g.legend.position = "b"
         g.add_data(Reference(ws, min_col=2 + 3 * j, max_col=4 + 3 * j, min_row=4, max_row=ult), titles_from_data=True)
         g.set_categories(Reference(ws, min_col=1, min_row=5, max_row=ult))
