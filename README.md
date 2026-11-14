@@ -65,6 +65,7 @@ A mano:
 
 ```bash
 pip install -r requirements.txt
+pip install jupyter   # solo para abrir los notebooks
 ```
 
 `x13binary` trae el motor del X-13; no hace falta instalar el programa del
