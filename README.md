@@ -59,8 +59,12 @@ variables derivadas (márgenes, corte efectivo). Detalle en `db/README.md`.
 
 ## Requisitos
 
+Python 3.13 o más nuevo (probado con 3.13 y 3.14). En Windows alcanza con
+hacer doble clic en `instalar.bat` (ver [`docs/salida_mensual.md`](docs/salida_mensual.md)).
+A mano:
+
 ```bash
-pip install pandas numpy scipy scikit-learn openpyxl xlrd requests beautifulsoup4 matplotlib statsmodels jupyter x13binary
+pip install -r requirements.txt
 ```
 
 `x13binary` trae el motor del X-13; no hace falta instalar el programa del
@@ -287,16 +291,16 @@ python scripts/prueba_registro_holdout.py   # simula el holdout y compara con SC
   `docs/informe/informe_bcr.pdf`.
 - [x] **Explicación y registro** — Contribuciones (SCRUM-35) y registro de
   estimaciones (SCRUM-44).
-- [ ] **Entrega** — Pipeline (SCRUM-38, probado en Windows) y presentación
-  final (SCRUM-37).
+- [x] **Estimación mensual** — Pipeline (SCRUM-38, probado en Windows) y
+  salida mensual con doble clic en Excel y HTML (SCRUM-64).
+- [ ] **Entrega** — Presentación final (SCRUM-37).
 
-Estado del backlog consultado el **11/11/2026**. Los datos y métricas
+Estado del backlog consultado el **14/11/2026**. Los datos y métricas
 versionados no prueban por sí solos la finalización de los tickets pendientes.
 
 ## Equipo
 
 - Chocobares, Juan Cruz
 - Formenti, Agustín
-- Morenico, Andrés
+- Ortiz, Victoria
 - Romero, María Florencia
-- Ortíz, Victoria
