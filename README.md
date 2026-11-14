@@ -283,11 +283,12 @@ python scripts/prueba_registro_holdout.py   # simula el holdout y compara con SC
   (SCRUM-31).
 - [x] **Modelo final** — Comparación y elección (SCRUM-34) y error sobre la
   variación del IACA (SCRUM-42).
-- [x] **Informe, parte 1** — Contexto y método (SCRUM-36), en `docs/informe/`.
+- [x] **Informe final** — Partes 1 y 2 (SCRUM-36 y SCRUM-61), en
+  `docs/informe/informe_bcr.pdf`.
 - [x] **Explicación y registro** — Contribuciones (SCRUM-35) y registro de
   estimaciones (SCRUM-44).
-- [ ] **Entrega** — Pipeline (SCRUM-38, probado en Windows), informe parte 2
-  (SCRUM-61) y presentación final (SCRUM-37).
+- [ ] **Entrega** — Pipeline (SCRUM-38, probado en Windows) y presentación
+  final (SCRUM-37).
 
 Estado del backlog consultado el **11/11/2026**. Los datos y métricas
 versionados no prueban por sí solos la finalización de los tickets pendientes.
