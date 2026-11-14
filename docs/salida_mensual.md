@@ -97,7 +97,7 @@ o a un drive de la BCR cada tanto, por si se rompe la PC.
 |---|---|
 | `Falta instalar el entorno` | Doble clic en `instalar.bat`. |
 | `No se encontró Python` | Instalar Python desde python.org, marcando "Add python.exe to PATH". |
-| `El Excel ... está abierto` | Si el mensaje dice que la estimación ya quedó guardada, cerrar el Excel y correr `--regenerar AAAA-MM` (no hace falta estimar de nuevo: el Excel sale con los números de esta corrida). Si no, cerrar el Excel y volver a correr. |
+| `El Excel ... está abierto` | Cerrar el Excel y volver a hacer doble clic en `correr_estimacion.bat`. Desde la consola también se puede correr `--regenerar AAAA-MM`, que arma el Excel con la estimación que ya se hizo, sin volver a estimar. |
 | `NO SE ESTIMÓ (no es un error): Todavía no se puede estimar <mes>` | Es antes del 28 del mes siguiente. Volver a correr desde la fecha que indica. |
 | `NO SE ESTIMÓ (no es un error): Todavía no están los datos de <mes>` | Las ventas de gasoil o las exportaciones del mes no salieron todavía. Volver a correr cuando salgan. |
 | `NO SE ESTIMÓ (no es un error): El sitio de la Secretaría de Energía no responde…` | No es un error del programa: el sitio está caído (ya se reintentó 3 veces) y sin la producción no se sabe qué mes estimar. Esperar unas horas y volver a correr. Si el caído es otro sitio, sigue con el dato anterior: muestra `FALLÓ <fuente>: el sitio no responde` y el Excel y el HTML avisan arriba qué fuente falló y de qué mes es el dato que se usó. Conviene volver a correr cuando el sitio vuelva. |

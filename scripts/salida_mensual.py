@@ -182,8 +182,9 @@ def escribir_informes(datos: dict, carpeta: Path) -> dict[str, Path]:
     carpeta.mkdir(parents=True, exist_ok=True)
     r["json"].write_text(json.dumps(datos, ensure_ascii=False, indent=1), encoding="utf-8")
     if excel_abierto(r["excel"]):
-        raise RuntimeError(f"El Excel {r['excel'].name} está abierto. La estimación ya quedó guardada: "
-                           f"cerralo y corré --regenerar {datos['mes']} (no hace falta estimar de nuevo).")
+        raise RuntimeError(f"El Excel {r['excel'].name} está abierto. Cerralo y volvé a hacer doble clic "
+                           f"en correr_estimacion.bat. (Desde la consola también sirve --regenerar {datos['mes']}, "
+                           "que arma el Excel con esta estimación sin volver a estimar.)")
     return regenerar(datos["mes"], carpeta)
 
 
