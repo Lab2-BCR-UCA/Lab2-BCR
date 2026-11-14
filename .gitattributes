@@ -1,0 +1,2 @@
+# Los .bat tienen que tener fin de línea de Windows para que cmd los lea bien.
+*.bat text eol=crlf
