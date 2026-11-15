@@ -5,7 +5,7 @@ Código: `scripts/salida_mensual.py`, `scripts/informe_excel.py` y
 
 ## 1. Instalación (una sola vez)
 
-Hace falta Python (probado con 3.13 y 3.14; 3.11 o más nuevo debería andar), instalado desde python.org con la opción
+Hace falta Python 3.13 o más nuevo (probado con 3.13 y 3.14), instalado desde python.org con la opción
 "Add python.exe to PATH". Después, doble clic en **`instalar.bat`**: crea el
 entorno de Python (`.venv`) e instala las librerías de `requirements.txt`.
 Necesita internet y tarda unos minutos.
